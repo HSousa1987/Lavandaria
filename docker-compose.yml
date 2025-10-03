@@ -1,0 +1,55 @@
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: lavandaria-db
+    restart: always
+    environment:
+      POSTGRES_USER: lavandaria
+      POSTGRES_PASSWORD: lavandaria2025
+      POSTGRES_DB: lavandaria
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - lavandaria-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lavandaria"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node.js Application
+  app:
+    build: .
+    container_name: lavandaria-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: lavandaria
+      DB_PASSWORD: lavandaria2025
+      DB_NAME: lavandaria
+      SESSION_SECRET: your-secret-key-change-this-in-production
+      PORT: 3000
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - lavandaria-network
+
+volumes:
+  postgres-data:
+
+networks:
+  lavandaria-network:
+    driver: bridge
