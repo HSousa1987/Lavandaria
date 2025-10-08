@@ -36,7 +36,6 @@ const Dashboard = () => {
   const [orderDetailData, setOrderDetailData] = useState(null);
   const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
   const [userForm, setUserForm] = useState({
-    username: '',
     password: '',
     role: 'worker',
     first_name: '',
@@ -53,38 +52,6 @@ const Dashboard = () => {
     country: 'Portugal',
     is_active: true
   });
-
-  // Function to sanitize username (remove accents and special characters)
-  const sanitizeUsername = (text) => {
-    if (!text) return '';
-
-    // Normalize to remove accents (NFD = Normalization Form Canonical Decomposition)
-    const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-    // Remove special characters, keep only letters, numbers, dots and underscores
-    // Convert to lowercase
-    return normalized
-      .toLowerCase()
-      .replace(/[^a-z0-9._]/g, '')
-      .replace(/\s+/g, ''); // Remove any remaining spaces
-  };
-
-  // Auto-generate username from first and last name
-  const generateUsername = (firstName, lastName) => {
-    if (!firstName && !lastName) return '';
-
-    const sanitizedFirst = sanitizeUsername(firstName);
-    const sanitizedLast = sanitizeUsername(lastName);
-
-    if (sanitizedFirst && sanitizedLast) {
-      return `${sanitizedFirst}.${sanitizedLast}`;
-    } else if (sanitizedFirst) {
-      return sanitizedFirst;
-    } else if (sanitizedLast) {
-      return sanitizedLast;
-    }
-    return '';
-  };
   const [clientForm, setClientForm] = useState({
     phone: '',
     first_name: '',
@@ -115,11 +82,9 @@ const Dashboard = () => {
     country: 'Portugal',
     scheduled_date: '',
     scheduled_time: '',
-    assigned_worker_ids: [], // Changed to array for multiple workers
-    estimated_hours: '',
+    assigned_worker_id: '',
     hourly_rate: 15.00,
-    special_instructions: '',
-    notes: ''
+    special_instructions: ''
   });
   const [laundryOrderForm, setLaundryOrderForm] = useState({
     client_id: '',
@@ -127,7 +92,6 @@ const Dashboard = () => {
     total_weight_kg: '',
     price_per_kg: 3.50,
     expected_ready_date: '',
-    assigned_worker_id: '',
     special_instructions: '',
     items: [],
     service_id: '',
@@ -171,11 +135,7 @@ const Dashboard = () => {
         setStats(statsRes.data);
 
         // Fetch clients
-        console.log('🔵🔵🔵 FRONTEND: Fetching clients from /api/clients');
         const clientsRes = await axios.get('/api/clients');
-        console.log('✅ FRONTEND: Clients fetched successfully');
-        console.log('✅ Number of clients:', clientsRes.data.length);
-        console.log('✅ Clients data sample:', clientsRes.data[0]);
         setClients(clientsRes.data);
 
         // Fetch orders
@@ -232,12 +192,6 @@ const Dashboard = () => {
         setLaundryOrdersNew(laundryOrdersRes.data);
       }
     } catch (err) {
-      console.error('❌❌❌ FRONTEND ERROR IN fetchData!');
-      console.error('❌ Error:', err);
-      console.error('❌ Error message:', err.message);
-      console.error('❌ Error response:', err.response);
-      console.error('❌ Error response data:', err.response?.data);
-      console.error('❌ Error response status:', err.response?.status);
       setError(err.response?.data?.error || 'Failed to load data');
       console.error('Data fetch error:', err);
     } finally {
@@ -263,10 +217,8 @@ const Dashboard = () => {
       setShowUserForm(false);
       setEditingUser(null);
       setUserForm({
-        username: '', password: '', role: 'worker', first_name: '', last_name: '',
-        email: '', phone: '', date_of_birth: '', nif: '',
-        address_line1: '', address_line2: '', city: '', postal_code: '', district: '', country: 'Portugal',
-        is_active: true
+        password: '', role: 'worker', first_name: '', last_name: '',
+        email: '', phone: '', date_of_birth: '', nif: '', street: '', zip_code: '', district: '', is_active: true
       });
       fetchData();
       setTimeout(() => setSuccess(''), 3000);
@@ -289,7 +241,6 @@ const Dashboard = () => {
   const handleEditUser = (user) => {
     setEditingUser(user);
     setUserForm({
-      username: user.username || '',
       password: '', // Don't show password
       role: user.role,
       first_name: user.first_name || '',
@@ -298,12 +249,9 @@ const Dashboard = () => {
       phone: user.phone || '',
       date_of_birth: formatDateForInput(user.date_of_birth),
       nif: user.nif || '',
-      address_line1: user.address_line1 || '',
-      address_line2: user.address_line2 || '',
-      city: user.city || '',
-      postal_code: user.postal_code || '',
+      street: user.street || '',
+      zip_code: user.zip_code || '',
       district: user.district || '',
-      country: user.country || 'Portugal',
       is_active: user.is_active !== undefined ? user.is_active : true
     });
     setShowUserForm(true);
@@ -311,69 +259,23 @@ const Dashboard = () => {
 
   const handleCreateClient = async (e) => {
     e.preventDefault();
-
-    console.log('🟢🟢🟢 ==========================================');
-    console.log('🟢 FRONTEND: handleCreateClient called');
-    console.log('🟢🟢🟢 ==========================================');
-    console.log('📤 CLIENT FORM DATA TO SEND:');
-    console.log('   phone:', clientForm.phone);
-    console.log('   first_name:', clientForm.first_name);
-    console.log('   last_name:', clientForm.last_name);
-    console.log('   email:', clientForm.email);
-    console.log('   date_of_birth:', clientForm.date_of_birth);
-    console.log('   nif:', clientForm.nif);
-    console.log('   address_line1:', clientForm.address_line1);
-    console.log('   address_line2:', clientForm.address_line2);
-    console.log('   city:', clientForm.city);
-    console.log('   postal_code:', clientForm.postal_code);
-    console.log('   district:', clientForm.district);
-    console.log('   country:', clientForm.country);
-    console.log('   notes:', clientForm.notes);
-    console.log('   is_enterprise:', clientForm.is_enterprise);
-    console.log('   company_name:', clientForm.company_name);
-    console.log('   is_active:', clientForm.is_active);
-    console.log('🟢 ==========================================');
-
     try {
       if (editingClient) {
-        console.log('📝 UPDATING existing client ID:', editingClient.id);
-        const response = await axios.put(`/api/clients/${editingClient.id}`, clientForm);
-        console.log('✅ UPDATE Response:', response.data);
+        await axios.put(`/api/clients/${editingClient.id}`, clientForm);
         setSuccess('Client updated successfully');
       } else {
-        console.log('➕ CREATING new client');
-        console.log('📡 Sending POST to /api/clients');
-        const response = await axios.post('/api/clients', clientForm);
-        console.log('✅✅✅ CREATE SUCCESSFUL!');
-        console.log('✅ Response status:', response.status);
-        console.log('✅ Response data:', response.data);
+        await axios.post('/api/clients', clientForm);
         setSuccess('Client created successfully');
       }
-
-      console.log('🧹 Closing form and resetting state');
       setShowClientForm(false);
       setEditingClient(null);
       setClientForm({
         phone: '', first_name: '', last_name: '', email: '', date_of_birth: '',
-        nif: '', address_line1: '', address_line2: '', city: '', postal_code: '', district: '', country: 'Portugal',
-        notes: '', is_enterprise: false, company_name: '', is_active: true
+        nif: '', street: '', zip_code: '', district: '', notes: '', is_enterprise: false, company_name: '', is_active: true
       });
-
-      console.log('🔄 Fetching updated data...');
       fetchData();
       setTimeout(() => setSuccess(''), 3000);
-      console.log('🟢🟢🟢 ==========================================\n');
     } catch (err) {
-      console.error('❌❌❌ ==========================================');
-      console.error('❌ FRONTEND ERROR IN handleCreateClient!');
-      console.error('❌ Error object:', err);
-      console.error('❌ Error message:', err.message);
-      console.error('❌ Error response:', err.response);
-      console.error('❌ Error response data:', err.response?.data);
-      console.error('❌ Error response status:', err.response?.status);
-      console.error('❌ Error response headers:', err.response?.headers);
-      console.error('❌ Error config:', err.config);
-      console.error('❌❌❌ ==========================================\n');
       setError(err.response?.data?.error || 'Failed to save client');
     }
   };
@@ -387,12 +289,9 @@ const Dashboard = () => {
       email: client.email || '',
       date_of_birth: formatDateForInput(client.date_of_birth),
       nif: client.nif || '',
-      address_line1: client.address_line1 || '',
-      address_line2: client.address_line2 || '',
-      city: client.city || '',
-      postal_code: client.postal_code || '',
+      street: client.street || '',
+      zip_code: client.zip_code || '',
       district: client.district || '',
-      country: client.country || 'Portugal',
       notes: client.notes || '',
       is_enterprise: client.is_enterprise || false,
       company_name: client.company_name || '',
@@ -415,9 +314,8 @@ const Dashboard = () => {
       setEditingCleaningJob(null);
       setCleaningJobForm({
         client_id: '', job_type: 'airbnb', property_name: '', address_line1: '',
-        address_line2: '', city: '', postal_code: '', district: '', country: 'Portugal',
-        scheduled_date: '', scheduled_time: '', assigned_worker_ids: [], estimated_hours: '',
-        hourly_rate: 15.00, special_instructions: '', notes: ''
+        address_line2: '', city: '', postal_code: '', scheduled_date: '',
+        scheduled_time: '', assigned_worker_id: '', hourly_rate: 15.00, special_instructions: ''
       });
       fetchData();
       setTimeout(() => setSuccess(''), 3000);
@@ -459,7 +357,7 @@ const Dashboard = () => {
       setEditingLaundryOrder(null);
       setLaundryOrderForm({
         client_id: '', order_type: 'bulk_kg', total_weight_kg: '',
-        price_per_kg: 3.50, expected_ready_date: '', assigned_worker_id: '', special_instructions: '', items: [],
+        price_per_kg: 3.50, expected_ready_date: '', special_instructions: '', items: [],
         service_id: '', delivery_requested: false
       });
       fetchData();
@@ -1222,25 +1120,6 @@ const Dashboard = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Username {!editingUser && '*'}
-                  </label>
-                  <input
-                    type="text"
-                    value={userForm.username}
-                    onChange={(e) => setUserForm({ ...userForm, username: sanitizeUsername(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                    required={!editingUser}
-                    placeholder="Auto-generated from first and last name"
-                    readOnly={editingUser}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {editingUser
-                      ? 'Username cannot be changed'
-                      : 'Automatically generated from first and last name (you can edit it)'}
-                  </p>
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Password {!editingUser && '*'} {editingUser && '(leave blank to keep current)'}
                   </label>
                   <input
@@ -1273,11 +1152,7 @@ const Dashboard = () => {
                   <input
                     type="text"
                     value={userForm.first_name}
-                    onChange={(e) => {
-                      const newFirstName = e.target.value;
-                      const newUsername = generateUsername(newFirstName, userForm.last_name);
-                      setUserForm({ ...userForm, first_name: newFirstName, username: newUsername });
-                    }}
+                    onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
                   />
@@ -1287,11 +1162,7 @@ const Dashboard = () => {
                   <input
                     type="text"
                     value={userForm.last_name}
-                    onChange={(e) => {
-                      const newLastName = e.target.value;
-                      const newUsername = generateUsername(userForm.first_name, newLastName);
-                      setUserForm({ ...userForm, last_name: newLastName, username: newUsername });
-                    }}
+                    onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     required
                   />
@@ -1336,78 +1207,36 @@ const Dashboard = () => {
                     required
                   />
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
-                  <input
-                    type="text"
-                    value={userForm.address_line1}
-                    onChange={(e) => setUserForm({ ...userForm, address_line1: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="Street name and number"
-                    required
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
-                  <input
-                    type="text"
-                    value={userForm.address_line2}
-                    onChange={(e) => setUserForm({ ...userForm, address_line2: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="Apartment, floor, building (optional)"
-                  />
-                </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Street *</label>
                   <input
                     type="text"
-                    value={userForm.city}
-                    onChange={(e) => setUserForm({ ...userForm, city: e.target.value })}
+                    value={userForm.street}
+                    onChange={(e) => setUserForm({ ...userForm, street: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="Lisboa, Porto, etc."
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Zip Code *</label>
                   <input
                     type="text"
-                    value={userForm.postal_code}
-                    onChange={(e) => setUserForm({ ...userForm, postal_code: e.target.value })}
+                    value={userForm.zip_code}
+                    onChange={(e) => setUserForm({ ...userForm, zip_code: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="XXXX-XXX (e.g., 1000-001)"
+                    placeholder="1000-001"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
-                  <select
+                  <label className="block text-sm font-medium text-gray-700 mb-1">District *</label>
+                  <input
+                    type="text"
                     value={userForm.district}
                     onChange={(e) => setUserForm({ ...userForm, district: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="">Select District</option>
-                    <option value="Aveiro">Aveiro</option>
-                    <option value="Beja">Beja</option>
-                    <option value="Braga">Braga</option>
-                    <option value="Bragança">Bragança</option>
-                    <option value="Castelo Branco">Castelo Branco</option>
-                    <option value="Coimbra">Coimbra</option>
-                    <option value="Évora">Évora</option>
-                    <option value="Faro">Faro</option>
-                    <option value="Guarda">Guarda</option>
-                    <option value="Leiria">Leiria</option>
-                    <option value="Lisboa">Lisboa</option>
-                    <option value="Portalegre">Portalegre</option>
-                    <option value="Porto">Porto</option>
-                    <option value="Santarém">Santarém</option>
-                    <option value="Setúbal">Setúbal</option>
-                    <option value="Viana do Castelo">Viana do Castelo</option>
-                    <option value="Vila Real">Vila Real</option>
-                    <option value="Viseu">Viseu</option>
-                    <option value="Açores">Açores</option>
-                    <option value="Madeira">Madeira</option>
-                  </select>
+                    required
+                  />
                 </div>
                 <div className="col-span-2">
                   <label className="flex items-center space-x-2 cursor-pointer">
@@ -1555,78 +1384,36 @@ const Dashboard = () => {
                     required
                   />
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1 *</label>
-                  <input
-                    type="text"
-                    value={clientForm.address_line1}
-                    onChange={(e) => setClientForm({ ...clientForm, address_line1: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="Street name and number"
-                    required
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
-                  <input
-                    type="text"
-                    value={clientForm.address_line2}
-                    onChange={(e) => setClientForm({ ...clientForm, address_line2: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="Apartment, floor, building (optional)"
-                  />
-                </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Street *</label>
                   <input
                     type="text"
-                    value={clientForm.city}
-                    onChange={(e) => setClientForm({ ...clientForm, city: e.target.value })}
+                    value={clientForm.street}
+                    onChange={(e) => setClientForm({ ...clientForm, street: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="Lisboa, Porto, etc."
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Zip Code *</label>
                   <input
                     type="text"
-                    value={clientForm.postal_code}
-                    onChange={(e) => setClientForm({ ...clientForm, postal_code: e.target.value })}
+                    value={clientForm.zip_code}
+                    onChange={(e) => setClientForm({ ...clientForm, zip_code: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="XXXX-XXX (e.g., 1000-001)"
+                    placeholder="1000-001"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
-                  <select
+                  <label className="block text-sm font-medium text-gray-700 mb-1">District *</label>
+                  <input
+                    type="text"
                     value={clientForm.district}
                     onChange={(e) => setClientForm({ ...clientForm, district: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="">Select District</option>
-                    <option value="Aveiro">Aveiro</option>
-                    <option value="Beja">Beja</option>
-                    <option value="Braga">Braga</option>
-                    <option value="Bragança">Bragança</option>
-                    <option value="Castelo Branco">Castelo Branco</option>
-                    <option value="Coimbra">Coimbra</option>
-                    <option value="Évora">Évora</option>
-                    <option value="Faro">Faro</option>
-                    <option value="Guarda">Guarda</option>
-                    <option value="Leiria">Leiria</option>
-                    <option value="Lisboa">Lisboa</option>
-                    <option value="Portalegre">Portalegre</option>
-                    <option value="Porto">Porto</option>
-                    <option value="Santarém">Santarém</option>
-                    <option value="Setúbal">Setúbal</option>
-                    <option value="Viana do Castelo">Viana do Castelo</option>
-                    <option value="Vila Real">Vila Real</option>
-                    <option value="Viseu">Viseu</option>
-                    <option value="Açores">Açores</option>
-                    <option value="Madeira">Madeira</option>
-                  </select>
+                    required
+                  />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
@@ -1774,18 +1561,17 @@ const Dashboard = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Hours *</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0.5"
-                    value={cleaningJobForm.estimated_hours}
-                    onChange={(e) => setCleaningJobForm({ ...cleaningJobForm, estimated_hours: parseFloat(e.target.value) })}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Assign Worker</label>
+                  <select
+                    value={cleaningJobForm.assigned_worker_id}
+                    onChange={(e) => setCleaningJobForm({ ...cleaningJobForm, assigned_worker_id: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg"
-                    placeholder="e.g., 2.5"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Used to calculate estimated cost</p>
+                  >
+                    <option value="">Unassigned</option>
+                    {(isMaster ? users : workers).filter(u => u.role === 'worker').map(w => (
+                      <option key={w.id} value={w.id}>{w.full_name || w.username}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Hourly Rate (€) *</label>
@@ -1797,47 +1583,6 @@ const Dashboard = () => {
                     className="w-full px-3 py-2 border rounded-lg"
                     required
                   />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Assign Workers (Multiple) *</label>
-                  <div className="border rounded-lg p-3 max-h-32 overflow-y-auto bg-gray-50">
-                    {(isMaster ? users : workers).filter(u => u.role === 'worker' || u.role === 'admin').length === 0 ? (
-                      <p className="text-sm text-gray-500">No workers available</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {(isMaster ? users : workers).filter(u => u.role === 'worker' || u.role === 'admin').map(w => (
-                          <label key={w.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 p-1 rounded">
-                            <input
-                              type="checkbox"
-                              checked={(cleaningJobForm.assigned_worker_ids || []).includes(w.id)}
-                              onChange={(e) => {
-                                const currentWorkers = cleaningJobForm.assigned_worker_ids || [];
-                                if (e.target.checked) {
-                                  setCleaningJobForm({
-                                    ...cleaningJobForm,
-                                    assigned_worker_ids: [...currentWorkers, w.id]
-                                  });
-                                } else {
-                                  setCleaningJobForm({
-                                    ...cleaningJobForm,
-                                    assigned_worker_ids: currentWorkers.filter(id => id !== w.id)
-                                  });
-                                }
-                              }}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <span className="text-sm">
-                              {w.full_name || w.username}
-                              {w.role === 'admin' && <span className="ml-1 text-xs text-blue-600">(Admin)</span>}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Select all workers who will work on this job. Admins can also be assigned. Selected: {(cleaningJobForm.assigned_worker_ids || []).length}
-                  </p>
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions</label>
@@ -2057,24 +1802,6 @@ const Dashboard = () => {
                     )}
                   </div>
                 )}
-
-                {/* Worker Assignment */}
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Assign Worker/Admin (Optional)</label>
-                  <select
-                    value={laundryOrderForm.assigned_worker_id}
-                    onChange={(e) => setLaundryOrderForm({ ...laundryOrderForm, assigned_worker_id: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg"
-                  >
-                    <option value="">Unassigned</option>
-                    {(isMaster ? users : workers).filter(u => u.role === 'worker' || u.role === 'admin').map(w => (
-                      <option key={w.id} value={w.id}>
-                        {w.full_name || w.username}{w.role === 'admin' ? ' (Admin)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">Optionally assign a worker or admin to handle this laundry order</p>
-                </div>
               </div>
 
               <div className="flex gap-3 mt-6">

@@ -32,12 +32,15 @@ CREATE TABLE cleaning_jobs (
     address_line2 VARCHAR(200),
     city VARCHAR(100) NOT NULL,
     postal_code VARCHAR(20),
+    district VARCHAR(100),
+    country VARCHAR(100) DEFAULT 'Portugal',
 
     -- Scheduling
     scheduled_date DATE NOT NULL,
     scheduled_time TIME NOT NULL,
 
     -- Time Tracking & Billing
+    estimated_hours DECIMAL(5,2),
     actual_start_time TIMESTAMP,
     actual_end_time TIMESTAMP,
     total_duration_minutes INTEGER,
@@ -78,6 +81,21 @@ CREATE INDEX idx_cleaning_jobs_worker ON cleaning_jobs(assigned_worker_id);
 CREATE INDEX idx_cleaning_jobs_status ON cleaning_jobs(status);
 CREATE INDEX idx_cleaning_jobs_date ON cleaning_jobs(scheduled_date);
 CREATE INDEX idx_cleaning_jobs_type ON cleaning_jobs(job_type);
+
+-- ==============================================
+-- CLEANING JOB WORKERS (Multiple workers per job)
+-- ==============================================
+CREATE TABLE cleaning_job_workers (
+    id SERIAL PRIMARY KEY,
+    cleaning_job_id INTEGER NOT NULL REFERENCES cleaning_jobs(id) ON DELETE CASCADE,
+    worker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_primary BOOLEAN DEFAULT FALSE,
+    UNIQUE(cleaning_job_id, worker_id)
+);
+
+CREATE INDEX idx_job_workers_job ON cleaning_job_workers(cleaning_job_id);
+CREATE INDEX idx_job_workers_worker ON cleaning_job_workers(worker_id);
 
 -- ==============================================
 -- CLEANING TIME LOGS (for accurate billing)

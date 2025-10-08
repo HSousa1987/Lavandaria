@@ -261,9 +261,13 @@ router.get('/:id/full', requireAuth, async (req, res) => {
 router.post('/', requireMasterOrAdmin, async (req, res) => {
     const {
         client_id, job_type, property_name, address_line1, address_line2,
-        city, postal_code, scheduled_date, scheduled_time, assigned_worker_id,
-        hourly_rate, special_instructions, notes
+        city, postal_code, district, country, scheduled_date, scheduled_time,
+        assigned_worker_ids, estimated_hours, hourly_rate, special_instructions, notes
     } = req.body;
+
+    console.log('🧹 [CLEANING JOB] Creating new cleaning job...');
+    console.log('📋 [CLEANING JOB] Request body:', JSON.stringify(req.body, null, 2));
+    console.log('👤 [CLEANING JOB] User session:', { userId: req.session.userId, userType: req.session.userType });
 
     try {
         // Build full property address
@@ -271,26 +275,69 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
             ? `${property_name}, ${address_line1}`
             : address_line1;
 
+        console.log('🏠 [CLEANING JOB] Property address built:', property_address);
+
+        // Parse worker IDs (can be array or single value)
+        let workerIds = [];
+        if (assigned_worker_ids) {
+            if (Array.isArray(assigned_worker_ids)) {
+                workerIds = assigned_worker_ids;
+            } else if (typeof assigned_worker_ids === 'string') {
+                workerIds = assigned_worker_ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            } else {
+                workerIds = [parseInt(assigned_worker_ids)];
+            }
+        }
+
+        console.log('👥 [CLEANING JOB] Parsed worker IDs:', workerIds);
+
+        // Use first worker as primary assigned worker (backward compatibility)
+        const primary_worker_id = workerIds.length > 0 ? workerIds[0] : null;
+
         const result = await pool.query(
             `INSERT INTO cleaning_jobs (
                 client_id, job_type, property_name, property_address,
-                address_line1, address_line2, city, postal_code,
-                scheduled_date, scheduled_time, assigned_worker_id,
+                address_line1, address_line2, city, postal_code, district, country,
+                scheduled_date, scheduled_time, assigned_worker_id, estimated_hours,
                 hourly_rate, special_instructions, notes, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             RETURNING *`,
             [
                 client_id, job_type, property_name, property_address,
-                address_line1, address_line2, city, postal_code,
-                scheduled_date, scheduled_time, assigned_worker_id,
+                address_line1, address_line2, city, postal_code, district, country || 'Portugal',
+                scheduled_date, scheduled_time, primary_worker_id, estimated_hours,
                 hourly_rate || 15.00, special_instructions, notes, req.session.userId
             ]
         );
 
+        const jobId = result.rows[0].id;
+        console.log('✅ [CLEANING JOB] Job created successfully:', result.rows[0]);
+
+        // Insert all workers into cleaning_job_workers table
+        if (workerIds.length > 0) {
+            for (let i = 0; i < workerIds.length; i++) {
+                const workerId = workerIds[i];
+                const isPrimary = i === 0; // First worker is primary
+                await pool.query(
+                    `INSERT INTO cleaning_job_workers (cleaning_job_id, worker_id, is_primary)
+                     VALUES ($1, $2, $3)
+                     ON CONFLICT (cleaning_job_id, worker_id) DO NOTHING`,
+                    [jobId, workerId, isPrimary]
+                );
+                console.log(`👤 [CLEANING JOB] Assigned worker ${workerId} to job ${jobId} (primary: ${isPrimary})`);
+            }
+        }
+
         res.status(201).json(result.rows[0]);
     } catch (error) {
-        console.error('Error creating cleaning job:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error('💥 [CLEANING JOB] Error creating cleaning job:', error);
+        console.error('💥 [CLEANING JOB] Error details:', {
+            message: error.message,
+            code: error.code,
+            detail: error.detail,
+            stack: error.stack
+        });
+        res.status(500).json({ error: 'Server error', details: error.message });
     }
 });
 
@@ -300,7 +347,7 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
 router.put('/:id', requireMasterOrAdmin, async (req, res) => {
     const {
         client_id, job_type, property_name, address_line1, address_line2,
-        city, postal_code, scheduled_date, scheduled_time, assigned_worker_id,
+        city, postal_code, district, country, scheduled_date, scheduled_time, assigned_worker_id,
         hourly_rate, status, payment_status, special_instructions, notes
     } = req.body;
 
@@ -322,6 +369,8 @@ router.put('/:id', requireMasterOrAdmin, async (req, res) => {
         const updatedAddressLine2 = address_line2 !== undefined ? address_line2 : current.address_line2;
         const updatedCity = city !== undefined ? city : current.city;
         const updatedPostalCode = postal_code !== undefined ? postal_code : current.postal_code;
+        const updatedDistrict = district !== undefined ? district : current.district;
+        const updatedCountry = country !== undefined ? country : (current.country || 'Portugal');
         const updatedScheduledDate = scheduled_date !== undefined ? scheduled_date : current.scheduled_date;
         const updatedScheduledTime = scheduled_time !== undefined ? scheduled_time : current.scheduled_time;
         const updatedAssignedWorkerId = assigned_worker_id !== undefined ? assigned_worker_id : current.assigned_worker_id;
@@ -338,15 +387,15 @@ router.put('/:id', requireMasterOrAdmin, async (req, res) => {
         const result = await pool.query(
             `UPDATE cleaning_jobs SET
                 client_id = $1, job_type = $2, property_name = $3, property_address = $4,
-                address_line1 = $5, address_line2 = $6, city = $7, postal_code = $8,
-                scheduled_date = $9, scheduled_time = $10, assigned_worker_id = $11,
-                hourly_rate = $12, status = $13, payment_status = $14,
-                special_instructions = $15, notes = $16
-             WHERE id = $17
+                address_line1 = $5, address_line2 = $6, city = $7, postal_code = $8, district = $9, country = $10,
+                scheduled_date = $11, scheduled_time = $12, assigned_worker_id = $13,
+                hourly_rate = $14, status = $15, payment_status = $16,
+                special_instructions = $17, notes = $18
+             WHERE id = $19
              RETURNING *`,
             [
                 updatedClientId, updatedJobType, updatedPropertyName, property_address,
-                updatedAddressLine1, updatedAddressLine2, updatedCity, updatedPostalCode,
+                updatedAddressLine1, updatedAddressLine2, updatedCity, updatedPostalCode, updatedDistrict, updatedCountry,
                 updatedScheduledDate, updatedScheduledTime, updatedAssignedWorkerId,
                 updatedHourlyRate, updatedStatus, updatedPaymentStatus,
                 updatedSpecialInstructions, updatedNotes,

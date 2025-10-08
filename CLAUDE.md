@@ -6,9 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Lavandaria** is a dual-business management system for:
 1. **Laundry Service** - Traditional clothing cleaning with order tracking
-2. **Airbnb Cleaning Service** - Property cleaning with photo verification and time tracking
+2. **Airbnb/House Cleaning Service** - Property cleaning with photo verification and time tracking
 
-The system serves three user types: Admin (full access), Clients (view orders), and Cleaners (submit work with photos).
+The system serves four user types:
+- **Master** (Owner - full system access, can create admins)
+- **Admin** (can create workers, manage clients/orders, has finance access, **can also work as cleaner**)
+- **Worker/Cleaner** (submit work with photos, track time, manage assigned jobs)
+- **Client** (view orders, download photos)
 
 ## Tech Stack
 
@@ -21,24 +25,47 @@ The system serves three user types: Admin (full access), Clients (view orders), 
 ## Architecture
 
 ### Database Schema (PostgreSQL)
-- `users` - Staff accounts (master, admin, worker)
+
+**Core Tables:**
+- `users` - Staff accounts (master, admin, worker) with username auto-generation
 - `clients` - Customer accounts (login via phone number)
-- `laundry_orders` - Clothing cleaning orders
-- `airbnb_orders` - Property cleaning orders
-- `cleaning_photos` - Photo verification for Airbnb jobs
-- `time_logs` - Worker time tracking
-- `payments` - Financial transactions
-- `tickets` - Issue reporting system for workers
 - `session` - Express session storage
+
+**New Cleaning Jobs System (Migration 002):**
+- `cleaning_jobs` - Main jobs table (with estimated_hours, district, country)
+- `cleaning_job_workers` - Junction table for multiple workers per job
+- `cleaning_job_photos` - Photo verification (before/after/detail)
+- `cleaning_time_logs` - Time tracking per worker
+- `job_notifications` - Push notifications
+
+**Laundry Orders:**
+- `laundry_orders_new` - New laundry system with worker assignment
+- `laundry_order_items` - Itemized orders
+- `laundry_services` - Service catalog/pricing
+
+**Legacy Tables (Still Used):**
+- `laundry_orders` - Old laundry orders
+- `airbnb_orders` - Old Airbnb cleaning orders
+- `cleaning_photos` - Old photo system
+
+**Other:**
+- `payments` - Financial transactions
+- `tickets` - Issue reporting system
 
 ### Backend Structure (Express API)
 - `server.js` - Main Express server
-- `routes/auth.js` - Authentication (dual login: user/client)
-- `routes/clients.js` - Client CRUD (Admin only)
-- `routes/laundry.js` - Laundry order management
-- `routes/airbnb.js` - Airbnb orders + photo uploads
+- `routes/auth.js` - Authentication with comprehensive emoji logging
+- `routes/clients.js` - Client CRUD (Master/Admin only)
+- `routes/cleaning-jobs.js` - **New** Cleaning jobs with multiple workers support
+- `routes/laundry-orders.js` - Laundry orders with worker assignment
+- `routes/laundry-services.js` - Service catalog management
 - `routes/payments.js` - Financial tracking
 - `routes/dashboard.js` - Dashboard statistics
+- `routes/tickets.js` - Issue reporting
+
+**Legacy routes:**
+- `routes/laundry.js` - Old laundry system
+- `routes/airbnb.js` - Old Airbnb system
 
 ### Frontend Structure (React)
 - `src/context/AuthContext.js` - Authentication state management
@@ -61,11 +88,15 @@ This script:
 1. Checks Docker is installed and running
 2. Creates necessary directories (uploads, logs)
 3. Copies .env.example to .env if needed
-4. Stops any existing containers
+4. Stops any existing containers with `-v` (removes volumes for fresh start)
 5. Builds Docker images
 6. Starts containers (db + app)
 7. Waits for database initialization
-8. Displays access URLs and default credentials
+8. **Runs all migrations automatically:**
+   - Migration 001: User/client extended fields
+   - Migration 002: New jobs system (cleaning_jobs, cleaning_job_workers, etc.)
+   - Migration 003: Pricing and settings
+9. Displays access URLs and default credentials
 
 ## Development Commands
 

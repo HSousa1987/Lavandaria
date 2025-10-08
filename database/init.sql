@@ -1,5 +1,11 @@
 -- Lavandaria PostgreSQL Database Schema
 -- This file is automatically executed when the database container starts
+--
+-- IMPORTANT: This is the BASE schema. Additional tables are created via migration files:
+--   - /database/migrations/002_create_jobs_system.sql (cleaning_jobs, cleaning_job_workers, etc.)
+--   - /database/migrations/003_pricing_and_settings.sql (laundry_services, etc.)
+--
+-- For a complete fresh deployment, run migrations after this init.sql
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -21,10 +27,21 @@ CREATE TABLE users (
     password VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL CHECK (role IN ('master', 'admin', 'worker')),
     full_name VARCHAR(100) NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
     email VARCHAR(100),
     phone VARCHAR(20),
+    date_of_birth DATE,
+    nif VARCHAR(20),
+    address_line1 VARCHAR(200),
+    address_line2 VARCHAR(200),
+    city VARCHAR(100),
+    postal_code VARCHAR(20),
+    district VARCHAR(100),
+    country VARCHAR(100) DEFAULT 'Portugal',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
@@ -35,11 +52,24 @@ CREATE TABLE clients (
     phone VARCHAR(20) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     full_name VARCHAR(100) NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
     email VARCHAR(100),
+    date_of_birth DATE,
+    nif VARCHAR(20),
+    address_line1 VARCHAR(200),
+    address_line2 VARCHAR(200),
+    city VARCHAR(100),
+    postal_code VARCHAR(20),
+    district VARCHAR(100),
+    country VARCHAR(100) DEFAULT 'Portugal',
     must_change_password BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
+    is_enterprise BOOLEAN DEFAULT FALSE,
+    company_name VARCHAR(200),
     notes TEXT
 );
 
@@ -52,6 +82,7 @@ CREATE TABLE properties (
     address_line2 VARCHAR(200),
     city VARCHAR(100) NOT NULL,
     postal_code VARCHAR(20) NOT NULL,
+    district VARCHAR(100),
     country VARCHAR(100) DEFAULT 'Portugal',
     latitude DECIMAL(10, 8),
     longitude DECIMAL(11, 8),
@@ -202,25 +233,36 @@ CREATE TABLE order_status_history (
 );
 
 -- Create indexes for better performance
-CREATE INDEX idx_clients_phone ON clients(phone);
-CREATE INDEX idx_properties_client ON properties(client_id);
-CREATE INDEX idx_properties_location ON properties(latitude, longitude);
-CREATE INDEX idx_laundry_orders_client ON laundry_orders(client_id);
-CREATE INDEX idx_laundry_orders_property ON laundry_orders(property_id);
-CREATE INDEX idx_laundry_orders_status ON laundry_orders(status);
-CREATE INDEX idx_airbnb_orders_client ON airbnb_orders(client_id);
-CREATE INDEX idx_airbnb_orders_property ON airbnb_orders(property_id);
-CREATE INDEX idx_airbnb_orders_cleaner ON airbnb_orders(assigned_cleaner_id);
-CREATE INDEX idx_airbnb_orders_status ON airbnb_orders(status);
-CREATE INDEX idx_airbnb_orders_scheduled ON airbnb_orders(scheduled_date, scheduled_time);
-CREATE INDEX idx_cleaning_photos_order ON cleaning_photos(airbnb_order_id);
-CREATE INDEX idx_time_logs_order ON time_logs(airbnb_order_id);
-CREATE INDEX idx_payments_client ON payments(client_id);
-CREATE INDEX idx_tickets_created_by ON tickets(created_by);
-CREATE INDEX idx_tickets_status ON tickets(status);
-CREATE INDEX idx_services_type ON services(type);
-CREATE INDEX idx_order_items_order ON order_items(order_id, order_type);
-CREATE INDEX idx_order_status_history_order ON order_status_history(order_id, order_type);
+CREATE INDEX IF NOT EXISTS idx_clients_phone ON clients(phone);
+CREATE INDEX IF NOT EXISTS idx_properties_client ON properties(client_id);
+CREATE INDEX IF NOT EXISTS idx_properties_location ON properties(latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_laundry_orders_client ON laundry_orders(client_id);
+CREATE INDEX IF NOT EXISTS idx_laundry_orders_property ON laundry_orders(property_id);
+CREATE INDEX IF NOT EXISTS idx_laundry_orders_status ON laundry_orders(status);
+CREATE INDEX IF NOT EXISTS idx_airbnb_orders_client ON airbnb_orders(client_id);
+CREATE INDEX IF NOT EXISTS idx_airbnb_orders_property ON airbnb_orders(property_id);
+CREATE INDEX IF NOT EXISTS idx_airbnb_orders_cleaner ON airbnb_orders(assigned_cleaner_id);
+CREATE INDEX IF NOT EXISTS idx_airbnb_orders_status ON airbnb_orders(status);
+CREATE INDEX IF NOT EXISTS idx_airbnb_orders_scheduled ON airbnb_orders(scheduled_date, scheduled_time);
+CREATE INDEX IF NOT EXISTS idx_cleaning_photos_order ON cleaning_photos(airbnb_order_id);
+CREATE INDEX IF NOT EXISTS idx_time_logs_order ON time_logs(airbnb_order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_client ON payments(client_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_created_by ON tickets(created_by);
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
+CREATE INDEX IF NOT EXISTS idx_services_type ON services(type);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id, order_type);
+CREATE INDEX IF NOT EXISTS idx_order_status_history_order ON order_status_history(order_id, order_type);
+
+-- Address-related indexes for performance
+CREATE INDEX IF NOT EXISTS idx_users_nif ON users(nif);
+CREATE INDEX IF NOT EXISTS idx_users_postal_code ON users(postal_code);
+CREATE INDEX IF NOT EXISTS idx_users_city ON users(city);
+CREATE INDEX IF NOT EXISTS idx_clients_nif ON clients(nif);
+CREATE INDEX IF NOT EXISTS idx_clients_postal_code ON clients(postal_code);
+CREATE INDEX IF NOT EXISTS idx_clients_city ON clients(city);
+CREATE INDEX IF NOT EXISTS idx_clients_is_enterprise ON clients(is_enterprise);
+CREATE INDEX IF NOT EXISTS idx_properties_district ON properties(district);
+CREATE INDEX IF NOT EXISTS idx_properties_postal_code ON properties(postal_code);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

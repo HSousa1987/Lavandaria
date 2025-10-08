@@ -14,8 +14,8 @@ router.get('/', requireMasterOrAdmin, async (req, res) => {
             // Master sees everyone
             query = `
                 SELECT u.id, u.username, u.role, u.full_name, u.first_name, u.last_name, u.email, u.phone,
-                       u.date_of_birth, u.nif, u.address, u.registration_date, u.created_at, u.is_active,
-                       u2.full_name as created_by_name
+                       u.date_of_birth, u.nif, u.address_line1, u.address_line2, u.city, u.postal_code, u.district, u.country,
+                       u.registration_date, u.created_at, u.is_active, u2.full_name as created_by_name
                 FROM users u
                 LEFT JOIN users u2 ON u.created_by = u2.id
                 ORDER BY
@@ -31,7 +31,8 @@ router.get('/', requireMasterOrAdmin, async (req, res) => {
             // Admin sees only workers
             query = `
                 SELECT id, username, role, full_name, first_name, last_name, email, phone,
-                       date_of_birth, nif, address, registration_date, created_at, is_active
+                       date_of_birth, nif, address_line1, address_line2, city, postal_code, district, country,
+                       registration_date, created_at, is_active
                 FROM users
                 WHERE role = 'worker'
                 ORDER BY created_at DESC
@@ -52,7 +53,8 @@ router.get('/:id', requireMasterOrAdmin, async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT id, username, role, full_name, first_name, last_name, email, phone,
-                    date_of_birth, nif, address, registration_date, created_at, is_active
+                    date_of_birth, nif, address_line1, address_line2, city, postal_code, district, country,
+                    registration_date, created_at, is_active
              FROM users WHERE id = $1`,
             [req.params.id]
         );
@@ -77,7 +79,8 @@ router.get('/:id', requireMasterOrAdmin, async (req, res) => {
 
 // Create new user (Master creates admins, Admin creates workers)
 router.post('/', requireMasterOrAdmin, async (req, res) => {
-    const { password, role, first_name, last_name, email, phone, date_of_birth, nif, street, zip_code, district } = req.body;
+    const { password, role, first_name, last_name, email, phone, date_of_birth, nif,
+            address_line1, address_line2, city, postal_code, district, country } = req.body;
 
     try {
         // Validation: Master can create anyone, Admin can only create workers
@@ -98,11 +101,12 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
 
         const result = await pool.query(
             `INSERT INTO users (username, password, role, full_name, first_name, last_name, email, phone,
-                               date_of_birth, nif, street, zip_code, district, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-             RETURNING id, username, role, full_name, first_name, last_name, email, phone, date_of_birth, nif, street, zip_code, district`,
+                               date_of_birth, nif, address_line1, address_line2, city, postal_code, district, country, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+             RETURNING id, username, role, full_name, first_name, last_name, email, phone, date_of_birth, nif,
+                       address_line1, address_line2, city, postal_code, district, country`,
             [username, hashedPassword, role, full_name, first_name, last_name, email, phone,
-             date_of_birth, nif, street, zip_code, district, req.session.userId]
+             date_of_birth, nif, address_line1, address_line2, city, postal_code, district, country || 'Portugal', req.session.userId]
         );
 
         res.status(201).json(result.rows[0]);
@@ -117,7 +121,8 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
 
 // Update user
 router.put('/:id', requireMasterOrAdmin, async (req, res) => {
-    const { password, first_name, last_name, email, phone, date_of_birth, nif, street, zip_code, district, is_active } = req.body;
+    const { password, first_name, last_name, email, phone, date_of_birth, nif,
+            address_line1, address_line2, city, postal_code, district, country, is_active } = req.body;
 
     // Use phone number as username
     const username = phone;
@@ -150,12 +155,15 @@ router.put('/:id', requireMasterOrAdmin, async (req, res) => {
             const result = await pool.query(
                 `UPDATE users
                  SET username = $1, password = $2, full_name = $3, first_name = $4, last_name = $5,
-                     email = $6, phone = $7, date_of_birth = $8, nif = $9, street = $10, zip_code = $11, district = $12, is_active = $13
-                 WHERE id = $14
+                     email = $6, phone = $7, date_of_birth = $8, nif = $9,
+                     address_line1 = $10, address_line2 = $11, city = $12, postal_code = $13, district = $14, country = $15,
+                     is_active = $16
+                 WHERE id = $17
                  RETURNING id, username, role, full_name, first_name, last_name, email, phone,
-                           date_of_birth, nif, street, zip_code, district, is_active`,
+                           date_of_birth, nif, address_line1, address_line2, city, postal_code, district, country, is_active`,
                 [username, hashedPassword, full_name, first_name, last_name, email, phone,
-                 date_of_birth, nif, street, zip_code, district, is_active, req.params.id]
+                 date_of_birth, nif, address_line1, address_line2, city, postal_code, district, country || 'Portugal',
+                 is_active, req.params.id]
             );
             res.json(result.rows[0]);
         } else {
@@ -163,11 +171,13 @@ router.put('/:id', requireMasterOrAdmin, async (req, res) => {
             const result = await pool.query(
                 `UPDATE users
                  SET username = $1, full_name = $2, first_name = $3, last_name = $4, email = $5, phone = $6,
-                     date_of_birth = $7, nif = $8, street = $9, zip_code = $10, district = $11, is_active = $12
-                 WHERE id = $13
+                     date_of_birth = $7, nif = $8, address_line1 = $9, address_line2 = $10, city = $11,
+                     postal_code = $12, district = $13, country = $14, is_active = $15
+                 WHERE id = $16
                  RETURNING id, username, role, full_name, first_name, last_name, email, phone,
-                           date_of_birth, nif, street, zip_code, district, is_active`,
-                [username, full_name, first_name, last_name, email, phone, date_of_birth, nif, street, zip_code, district,
+                           date_of_birth, nif, address_line1, address_line2, city, postal_code, district, country, is_active`,
+                [username, full_name, first_name, last_name, email, phone, date_of_birth, nif,
+                 address_line1, address_line2, city, postal_code, district, country || 'Portugal',
                  is_active, req.params.id]
             );
             res.json(result.rows[0]);
