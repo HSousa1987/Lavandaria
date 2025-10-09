@@ -31,7 +31,7 @@ The system serves four user types:
 - `clients` - Customer accounts (login via phone number)
 - `session` - Express session storage
 
-**New Cleaning Jobs System (Migration 002):**
+**Cleaning Jobs System:**
 - `cleaning_jobs` - Main jobs table (with estimated_hours, district, country)
 - `cleaning_job_workers` - Junction table for multiple workers per job
 - `cleaning_job_photos` - Photo verification (before/after/detail)
@@ -39,18 +39,30 @@ The system serves four user types:
 - `job_notifications` - Push notifications
 
 **Laundry Orders:**
-- `laundry_orders_new` - New laundry system with worker assignment
+- `laundry_orders_new` - Laundry system with worker assignment
 - `laundry_order_items` - Itemized orders
 - `laundry_services` - Service catalog/pricing
 
-**Legacy Tables (Still Used):**
-- `laundry_orders` - Old laundry orders
-- `airbnb_orders` - Old Airbnb cleaning orders
-- `cleaning_photos` - Old photo system
+**Payments (Split Tables for FK Integrity):**
+- `payments_cleaning` - Payments for cleaning jobs (FK → cleaning_jobs.id)
+- `payments_laundry` - Payments for laundry orders (FK → laundry_orders_new.id)
 
 **Other:**
-- `payments` - Financial transactions
 - `tickets` - Issue reporting system
+
+**Backup Tables (30-Day Retention - Purge on 2025-11-08):**
+- `backup_20251008_*` - Phase 1 migration backups (6 tables)
+- `final_backup_20251008_2145_*` - Phase 5 final backups (6 tables)
+- Total: 106 kB (negligible storage impact)
+
+**Legacy Tables (DROPPED 2025-10-08):**
+- ~~`laundry_orders`~~ → replaced by `laundry_orders_new`
+- ~~`airbnb_orders`~~ → replaced by `cleaning_jobs`
+- ~~`cleaning_photos`~~ → replaced by `cleaning_job_photos`
+- ~~`time_logs`~~ → replaced by `cleaning_time_logs`
+- ~~`services`~~ → replaced by `laundry_services`
+- ~~`order_items`~~ → replaced by `laundry_order_items`
+- ~~`payments`~~ → split into `payments_cleaning` + `payments_laundry`
 
 ### Backend Structure (Express API)
 - `server.js` - Main Express server
@@ -63,9 +75,10 @@ The system serves four user types:
 - `routes/dashboard.js` - Dashboard statistics
 - `routes/tickets.js` - Issue reporting
 
-**Legacy routes:**
-- `routes/laundry.js` - Old laundry system
-- `routes/airbnb.js` - Old Airbnb system
+**Deprecated routes (return 410 Gone):**
+- `routes/laundry.js` - Old laundry system (archived)
+- `routes/airbnb.js` - Old Airbnb system (archived)
+- `routes/services.js` - Old services (archived)
 
 ### Frontend Structure (React)
 - `src/context/AuthContext.js` - Authentication state management
@@ -93,10 +106,16 @@ This script:
 6. Starts containers (db + app)
 7. Waits for database initialization
 8. **Runs all migrations automatically:**
-   - Migration 001: User/client extended fields
+   - Migration 000: User/client extended fields (legacy address column)
+   - Migration 001: Address standardization (granular address fields)
    - Migration 002: New jobs system (cleaning_jobs, cleaning_job_workers, etc.)
    - Migration 003: Pricing and settings
 9. Displays access URLs and default credentials
+
+**⚠️ Migration Cutover (2025-10-08):**
+- Legacy tables dropped, NEW system is single source of truth
+- Backup tables retained for 30 days (purge on 2025-11-08)
+- See [MONITORING.md](./MONITORING.md) for retention policy
 
 ## Development Commands
 
@@ -212,19 +231,24 @@ cat backup.sql | docker exec -i lavandaria-db psql -U lavandaria lavandaria
 - `PUT /api/clients/:id` - Update client
 - `DELETE /api/clients/:id` - Delete client
 
-### Laundry Orders
-- `GET /api/laundry` - List orders (filtered by role)
-- `POST /api/laundry` - Create order (Master/Admin)
-- `PUT /api/laundry/:id` - Update order (Master/Admin)
+### Laundry Orders (NEW System)
+- `GET /api/laundry-orders` - List orders (filtered by role)
+- `POST /api/laundry-orders` - Create order (Master/Admin)
+- `PUT /api/laundry-orders/:id` - Update order (Master/Admin)
 
-### Airbnb Orders
-- `GET /api/airbnb` - List orders (filtered by role)
-- `GET /api/airbnb/:id` - Get order with photos and time logs
-- `POST /api/airbnb` - Create order (Master/Admin)
-- `PUT /api/airbnb/:id` - Update order (Worker/Admin/Master)
-- `POST /api/airbnb/:id/photos` - Upload photos (Worker/Admin/Master)
-- `POST /api/airbnb/:id/time/start` - Start time tracking
+### Cleaning Jobs (NEW System)
+- `GET /api/cleaning-jobs` - List jobs (filtered by role)
+- `GET /api/cleaning-jobs/:id` - Get job with photos and time logs
+- `POST /api/cleaning-jobs` - Create job (Master/Admin)
+- `PUT /api/cleaning-jobs/:id` - Update job (Worker/Admin/Master)
+- `POST /api/cleaning-jobs/:id/photos` - Upload photos (Worker/Admin/Master)
+- `POST /api/cleaning-jobs/:id/time/start` - Start time tracking
 - `PUT /api/time/:timeLogId/end` - End time tracking
+
+### Deprecated Endpoints (Return 410 Gone)
+- `GET /api/laundry` → Use `/api/laundry-orders`
+- `GET /api/airbnb` → Use `/api/cleaning-jobs`
+- `GET /api/services` → Use `/api/laundry-services`
 
 ### Tickets (Worker Issue Reporting)
 - `GET /api/tickets` - List tickets (Workers see own, Admin/Master see all)

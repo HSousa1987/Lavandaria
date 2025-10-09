@@ -179,10 +179,12 @@ const Dashboard = () => {
         setClients(clientsRes.data);
 
         // Fetch orders
-        const airbnbRes = await axios.get('/api/airbnb');
-        setAirbnbOrders(airbnbRes.data);
+        const airbnbRes = await axios.get('/api/cleaning-jobs');
+        console.log('🔵 [DASHBOARD] Loaded cleaning jobs from NEW endpoint:', airbnbRes.data._meta || airbnbRes.data.length);
+        setAirbnbOrders(airbnbRes.data.data || airbnbRes.data);
 
-        const laundryRes = await axios.get('/api/laundry');
+        const laundryRes = await axios.get('/api/laundry-orders');
+        console.log('🔵 [DASHBOARD] Loaded laundry orders from NEW endpoint:', laundryRes.data.length);
         setLaundryOrders(laundryRes.data);
 
         // Fetch new jobs system
@@ -203,8 +205,9 @@ const Dashboard = () => {
         }
       } else if (isWorker) {
         // Workers only see their assigned jobs
-        const airbnbRes = await axios.get('/api/airbnb');
-        setAirbnbOrders(airbnbRes.data);
+        const airbnbRes = await axios.get('/api/cleaning-jobs');
+        console.log('🔵 [DASHBOARD-WORKER] Loaded cleaning jobs from NEW endpoint:', airbnbRes.data._meta || airbnbRes.data.length);
+        setAirbnbOrders(airbnbRes.data.data || airbnbRes.data);
 
         // Get clients list for contact info
         const clientsRes = await axios.get('/api/clients');
@@ -218,10 +221,12 @@ const Dashboard = () => {
         setLaundryOrdersNew(laundryOrdersRes.data);
       } else if (isClient) {
         // Clients see their own orders
-        const airbnbRes = await axios.get('/api/airbnb');
-        setAirbnbOrders(airbnbRes.data);
+        const airbnbRes = await axios.get('/api/cleaning-jobs');
+        console.log('🔵 [DASHBOARD] Loaded cleaning jobs from NEW endpoint:', airbnbRes.data._meta || airbnbRes.data.length);
+        setAirbnbOrders(airbnbRes.data.data || airbnbRes.data);
 
-        const laundryRes = await axios.get('/api/laundry');
+        const laundryRes = await axios.get('/api/laundry-orders');
+        console.log('🔵 [DASHBOARD] Loaded laundry orders from NEW endpoint:', laundryRes.data.length);
         setLaundryOrders(laundryRes.data);
 
         // Fetch new jobs system

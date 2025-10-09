@@ -37,7 +37,8 @@ const WorkerDashboard = () => {
       setLoading(true);
       setError('');
 
-      const response = await axios.get('/api/airbnb');
+      const response = await axios.get('/api/cleaning-jobs');
+      console.log('🔵 [WORKER] Loaded cleaning jobs from NEW endpoint:', response.data._meta || response.data.length);
       setAssignedJobs(response.data);
 
     } catch (err) {
@@ -56,7 +57,8 @@ const WorkerDashboard = () => {
   const handleStartJob = async (job) => {
     try {
       setError('');
-      const response = await axios.post(`/api/airbnb/${job.id}/time/start`);
+      const response = await axios.post(`/api/cleaning-jobs/${job.id}/time/start`);
+      console.log('🔵 [WORKER] Started timer via NEW endpoint for job', job.id);
       setActiveJob(job);
       setStartTime(new Date());
       setSuccess('Job started successfully!');
@@ -117,7 +119,7 @@ const WorkerDashboard = () => {
         formData.append('photos', photo);
       });
 
-      await axios.post(`/api/airbnb/${selectedJob.id}/photos`, formData, {
+      await axios.post(`/api/cleaning-jobs/${selectedJob.id}/photos`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

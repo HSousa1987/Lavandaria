@@ -3,20 +3,30 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const { pool } = require('../config/database');
 const { body, validationResult } = require('express-validator');
+const { loginLimiter, addCorrelationId } = require('../middleware/rateLimiter');
+
+// Apply correlation ID middleware to all auth routes
+router.use(addCorrelationId);
 
 // Login for Admin/Cleaners
-router.post('/login/user', [
+router.post('/login/user', loginLimiter, [
     body('username').trim().notEmpty(),
     body('password').notEmpty()
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        console.log('❌ [AUTH] Validation errors:', errors.array());
-        return res.status(400).json({ errors: errors.array() });
+        console.log(`❌ [AUTH] Validation errors [${req.correlationId}]:`, errors.array());
+        return res.status(400).json({
+            errors: errors.array(),
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     }
 
     const { username, password } = req.body;
-    console.log('🔐 [AUTH] Login attempt for user:', username);
+    console.log(`🔐 [AUTH] Login attempt for user: ${username} [${req.correlationId}]`);
 
     try {
         const result = await pool.query(
@@ -24,29 +34,41 @@ router.post('/login/user', [
             [username]
         );
 
-        console.log('📊 [AUTH] Database query result - rows found:', result.rows.length);
+        console.log(`📊 [AUTH] Database query result - rows found: ${result.rows.length} [${req.correlationId}]`);
 
         if (result.rows.length === 0) {
-            console.log('❌ [AUTH] User not found in database:', username);
-            return res.status(401).json({ error: 'Invalid credentials' });
+            console.log(`❌ [AUTH] User not found in database: ${username} [${req.correlationId}]`);
+            return res.status(401).json({
+                error: 'Invalid credentials',
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
         }
 
         const user = result.rows[0];
-        console.log('👤 [AUTH] User found:', { id: user.id, username: user.username, role: user.role });
+        console.log(`👤 [AUTH] User found [${req.correlationId}]:`, { id: user.id, username: user.username, role: user.role });
 
         const validPassword = await bcrypt.compare(password, user.password);
-        console.log('🔑 [AUTH] Password validation result:', validPassword);
+        console.log(`🔑 [AUTH] Password validation result: ${validPassword} [${req.correlationId}]`);
 
         if (!validPassword) {
-            console.log('❌ [AUTH] Invalid password for user:', username);
-            return res.status(401).json({ error: 'Invalid credentials' });
+            console.log(`❌ [AUTH] Invalid password for user: ${username} [${req.correlationId}]`);
+            return res.status(401).json({
+                error: 'Invalid credentials',
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
         }
 
         req.session.userId = user.id;
         req.session.userType = user.role;
         req.session.userName = user.full_name;
 
-        console.log('✅ [AUTH] Login successful for user:', username, '- Role:', user.role);
+        console.log(`✅ [AUTH] Login successful for user: ${username} - Role: ${user.role} [${req.correlationId}]`);
 
         res.json({
             success: true,
@@ -55,25 +77,43 @@ router.post('/login/user', [
                 username: user.username,
                 role: user.role,
                 name: user.full_name
+            },
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
             }
         });
     } catch (error) {
-        console.error('💥 [AUTH] Login error:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error(`💥 [AUTH] Login error [${req.correlationId}]:`, error);
+        res.status(500).json({
+            error: 'Server error',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     }
 });
 
 // Login for Clients
-router.post('/login/client', [
+router.post('/login/client', loginLimiter, [
     body('phone').trim().notEmpty(),
     body('password').notEmpty()
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        console.log(`❌ [AUTH] Client validation errors [${req.correlationId}]:`, errors.array());
+        return res.status(400).json({
+            errors: errors.array(),
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     }
 
     const { phone, password } = req.body;
+    console.log(`🔐 [AUTH] Client login attempt for phone: ${phone} [${req.correlationId}]`);
 
     try {
         const result = await pool.query(
@@ -81,21 +121,40 @@ router.post('/login/client', [
             [phone]
         );
 
+        console.log(`📊 [AUTH] Client query result - rows found: ${result.rows.length} [${req.correlationId}]`);
+
         if (result.rows.length === 0) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            console.log(`❌ [AUTH] Client not found: ${phone} [${req.correlationId}]`);
+            return res.status(401).json({
+                error: 'Invalid credentials',
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
         }
 
         const client = result.rows[0];
         const validPassword = await bcrypt.compare(password, client.password);
+        console.log(`🔑 [AUTH] Client password validation: ${validPassword} [${req.correlationId}]`);
 
         if (!validPassword) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            console.log(`❌ [AUTH] Invalid password for client: ${phone} [${req.correlationId}]`);
+            return res.status(401).json({
+                error: 'Invalid credentials',
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
         }
 
         req.session.clientId = client.id;
         req.session.userType = 'client';
         req.session.userName = client.full_name;
         req.session.mustChangePassword = client.must_change_password;
+
+        console.log(`✅ [AUTH] Client login successful: ${phone} [${req.correlationId}]`);
 
         res.json({
             success: true,
@@ -104,11 +163,21 @@ router.post('/login/client', [
                 phone: client.phone,
                 name: client.full_name,
                 mustChangePassword: client.must_change_password
+            },
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
             }
         });
     } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error(`💥 [AUTH] Client login error [${req.correlationId}]:`, error);
+        res.status(500).json({
+            error: 'Server error',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     }
 });
 

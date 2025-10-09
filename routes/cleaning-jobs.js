@@ -42,6 +42,9 @@ const requireAuth = (req, res, next) => {
 // GET ALL CLEANING JOBS
 // ==============================================
 router.get('/', requireAuth, async (req, res) => {
+    const requestId = `REQ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.log(`🔵 [${requestId}] GET /api/cleaning-jobs - User: ${req.session.userType} (ID: ${req.session.userId || req.session.clientId})`);
+
     try {
         let query, params;
 
@@ -83,11 +86,17 @@ router.get('/', requireAuth, async (req, res) => {
             return res.status(403).json({ error: 'Access denied' });
         }
 
+        console.log(`🔵 [${requestId}] Executing query - Filter: ${req.session.userType}, Params: ${JSON.stringify(params)}`);
         const result = await pool.query(query, params);
-        res.json(result.rows);
+        console.log(`✅ [${requestId}] Success - Returned ${result.rows.length} jobs`);
+
+        res.json({
+            _meta: { requestId, timestamp: new Date().toISOString(), count: result.rows.length },
+            data: result.rows
+        });
     } catch (error) {
-        console.error('Error fetching cleaning jobs:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error(`❌ [${requestId}] Error fetching cleaning jobs:`, error.message);
+        res.status(500).json({ error: 'Server error', requestId });
     }
 });
 

@@ -36,7 +36,36 @@ mkdir -p logs
 if [ ! -f .env ]; then
     echo "📝 Creating .env file..."
     cp .env.example .env
-    echo "✅ .env file created. Please update it with your settings if needed."
+
+    # Generate a secure SESSION_SECRET
+    echo "🔐 Generating secure SESSION_SECRET..."
+    SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+
+    # Update .env with generated secret
+    if [ "$(uname)" == "Darwin" ]; then
+        # macOS
+        sed -i '' "s/^SESSION_SECRET=.*$/SESSION_SECRET=${SESSION_SECRET}/" .env
+    else
+        # Linux
+        sed -i "s/^SESSION_SECRET=.*$/SESSION_SECRET=${SESSION_SECRET}/" .env
+    fi
+
+    echo "✅ .env file created with secure SESSION_SECRET"
+else
+    # Check if SESSION_SECRET exists and is valid
+    if ! grep -q "^SESSION_SECRET=.\\{32,\\}" .env; then
+        echo "⚠️  WARNING: SESSION_SECRET is missing or too short in .env"
+        echo "   Generating new SESSION_SECRET..."
+        SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+
+        if [ "$(uname)" == "Darwin" ]; then
+            sed -i '' "s/^SESSION_SECRET=.*$/SESSION_SECRET=${SESSION_SECRET}/" .env
+        else
+            sed -i "s/^SESSION_SECRET=.*$/SESSION_SECRET=${SESSION_SECRET}/" .env
+        fi
+
+        echo "✅ SESSION_SECRET updated in .env"
+    fi
 fi
 
 # Stop and remove existing containers
@@ -56,13 +85,16 @@ sleep 10
 
 # Run database migrations
 echo "📦 Running database migrations..."
-echo "   - Applying user/client fields migration..."
-cat database/migrations/001_add_user_client_fields.sql | docker exec -i lavandaria-db psql -U lavandaria -d lavandaria 2>/dev/null || echo "   ⚠️  Migration 001 already applied or failed"
+echo "   - Applying migration 000: user/client fields..."
+cat database/migrations/000_add_user_client_fields.sql | docker exec -i lavandaria-db psql -U lavandaria -d lavandaria 2>/dev/null || echo "   ⚠️  Migration 000 already applied or failed"
 
-echo "   - Applying jobs system migration..."
+echo "   - Applying migration 001: standardize address fields..."
+cat database/migrations/001_standardize_address_fields.sql | docker exec -i lavandaria-db psql -U lavandaria -d lavandaria 2>/dev/null || echo "   ⚠️  Migration 001 already applied or failed"
+
+echo "   - Applying migration 002: jobs system..."
 cat database/migrations/002_create_jobs_system.sql | docker exec -i lavandaria-db psql -U lavandaria -d lavandaria 2>/dev/null || echo "   ⚠️  Migration 002 already applied or failed"
 
-echo "   - Applying pricing and settings migration..."
+echo "   - Applying migration 003: pricing and settings..."
 cat database/migrations/003_pricing_and_settings.sql | docker exec -i lavandaria-db psql -U lavandaria -d lavandaria 2>/dev/null || echo "   ⚠️  Migration 003 already applied or failed"
 
 echo "✅ Migrations completed"
