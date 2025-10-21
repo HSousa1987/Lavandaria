@@ -56,10 +56,50 @@ const corsOptions = {
     exposedHeaders: ['X-Correlation-Id']
 };
 
+// Global Correlation ID middleware
+const { addCorrelationId } = require('./middleware/rateLimiter');
+app.use(addCorrelationId);
+
+// Security Headers Configuration
+const isProd = process.env.NODE_ENV === 'production';
+const helmetConfig = isProd ? {
+    // Production: Strict CSP
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline needed for React inline styles
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'"],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            mediaSrc: ["'self'"],
+            frameSrc: ["'none'"]
+        }
+    },
+    hsts: {
+        maxAge: 31536000, // 1 year
+        includeSubDomains: true,
+        preload: true
+    },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+} : {
+    // Development: Relaxed CSP for localhost
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // needed for dev tools
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'", "http://localhost:*"],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"]
+        }
+    }
+};
+
 // Middleware
-app.use(helmet({
-    contentSecurityPolicy: false, // Disable for development, configure properly in production
-}));
+app.use(helmet(helmetConfig));
 app.use(morgan('dev'));
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -82,8 +122,21 @@ app.use(session({
     }
 }));
 
+// API Documentation (Swagger UI)
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
+const swaggerDocument = YAML.load(path.join(__dirname, 'docs/openapi.yaml'));
+
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'Lavandaria API Docs'
+}));
+
 // Static files - uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Health endpoints (no auth required)
+app.use('/api', require('./routes/health'));
 
 // API Routes
 app.use('/api/auth', require('./routes/auth'));

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../config/database');
 const { requireFinanceAccess } = require('../middleware/permissions');
+const { listResponse, validatePagination, errorResponse } = require('../middleware/validation');
 
 // ========================================
 // PAYMENT INTEGRITY VALIDATION
@@ -34,17 +35,34 @@ async function validateOrderExists(order_type, order_id) {
 
 // Get all payments (Master and Admin only, NOT workers)
 router.get('/', requireFinanceAccess, async (req, res) => {
+    console.log(`🔵 GET /api/payments [${req.correlationId}] - User: ${req.session.userType}`);
+
     try {
-        const result = await pool.query(
-            `SELECT p.*, c.full_name as client_name, c.phone as client_phone
+        const { limit, offset, sort, order } = validatePagination(req);
+
+        const query = `SELECT p.*, c.full_name as client_name, c.phone as client_phone
              FROM payments p
              JOIN clients c ON p.client_id = c.id
-             ORDER BY p.payment_date DESC`
-        );
-        res.json(result.rows);
+             ORDER BY p.payment_date ${order}
+             LIMIT $1 OFFSET $2`;
+
+        const countQuery = 'SELECT COUNT(*) FROM payments';
+
+        const [result, countResult] = await Promise.all([
+            pool.query(query, [limit, offset]),
+            pool.query(countQuery)
+        ]);
+
+        console.log(`✅ Payments fetched [${req.correlationId}]: ${result.rows.length} of ${countResult.rows[0].count}`);
+
+        return listResponse(res, result.rows, {
+            total: parseInt(countResult.rows[0].count),
+            limit,
+            offset
+        }, req);
     } catch (error) {
-        console.error('Error fetching payments:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error(`❌ Error fetching payments [${req.correlationId}]:`, error.message);
+        return errorResponse(res, 500, 'Server error', 'SERVER_ERROR', req);
     }
 });
 

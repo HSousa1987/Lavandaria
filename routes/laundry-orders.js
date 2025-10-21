@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../config/database');
 const { requireStaff, requireMasterOrAdmin } = require('../middleware/permissions');
+const { listResponse, validatePagination, errorResponse } = require('../middleware/validation');
 
 // Middleware to check authentication
 const requireAuth = (req, res, next) => {
@@ -23,11 +24,16 @@ const generateOrderNumber = () => {
 // GET ALL LAUNDRY ORDERS
 // ==============================================
 router.get('/', requireAuth, async (req, res) => {
+    console.log(`🔵 GET /api/laundry-orders [${req.correlationId}] - User: ${req.session.userType}`);
+
     try {
-        let query, params;
+        const { limit, offset, sort, order } = validatePagination(req);
+        let query, params, countQuery, countParams;
 
         if (req.session.userType === 'master' || req.session.userType === 'admin') {
             // Master/Admin see all orders
+            countQuery = 'SELECT COUNT(*) FROM laundry_orders_new';
+            countParams = [];
             query = `
                 SELECT lo.*,
                        c.full_name as client_name, c.phone as client_phone,
@@ -35,39 +41,56 @@ router.get('/', requireAuth, async (req, res) => {
                 FROM laundry_orders_new lo
                 JOIN clients c ON lo.client_id = c.id
                 LEFT JOIN users u ON lo.assigned_worker_id = u.id
-                ORDER BY lo.created_at DESC
+                ORDER BY lo.created_at ${order}
+                LIMIT $1 OFFSET $2
             `;
-            params = [];
+            params = [limit, offset];
         } else if (req.session.userType === 'worker') {
             // Workers see all orders (they process them)
+            countQuery = 'SELECT COUNT(*) FROM laundry_orders_new';
+            countParams = [];
             query = `
                 SELECT lo.*,
                        c.full_name as client_name, c.phone as client_phone
                 FROM laundry_orders_new lo
                 JOIN clients c ON lo.client_id = c.id
-                ORDER BY lo.created_at DESC
+                ORDER BY lo.created_at ${order}
+                LIMIT $1 OFFSET $2
             `;
-            params = [];
+            params = [limit, offset];
         } else if (req.session.userType === 'client') {
             // Clients see only their orders
+            countQuery = 'SELECT COUNT(*) FROM laundry_orders_new WHERE client_id = $1';
+            countParams = [req.session.clientId];
             query = `
                 SELECT lo.*,
                        u.full_name as worker_name
                 FROM laundry_orders_new lo
                 LEFT JOIN users u ON lo.assigned_worker_id = u.id
                 WHERE lo.client_id = $1
-                ORDER BY lo.created_at DESC
+                ORDER BY lo.created_at ${order}
+                LIMIT $2 OFFSET $3
             `;
-            params = [req.session.clientId];
+            params = [req.session.clientId, limit, offset];
         } else {
-            return res.status(403).json({ error: 'Access denied' });
+            return errorResponse(res, 403, 'Access denied', 'FORBIDDEN', req);
         }
 
-        const result = await pool.query(query, params);
-        res.json(result.rows);
+        const [result, countResult] = await Promise.all([
+            pool.query(query, params),
+            pool.query(countQuery, countParams)
+        ]);
+
+        console.log(`✅ Laundry orders fetched [${req.correlationId}]: ${result.rows.length} of ${countResult.rows[0].count}`);
+
+        return listResponse(res, result.rows, {
+            total: parseInt(countResult.rows[0].count),
+            limit,
+            offset
+        }, req);
     } catch (error) {
-        console.error('Error fetching laundry orders:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error(`❌ Error fetching laundry orders [${req.correlationId}]:`, error.message);
+        return errorResponse(res, 500, 'Server error', 'SERVER_ERROR', req);
     }
 });
 

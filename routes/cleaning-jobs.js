@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const { pool } = require('../config/database');
 const { requireStaff, requireMasterOrAdmin } = require('../middleware/permissions');
+const { listResponse, validatePagination, errorResponse } = require('../middleware/validation');
 
 // Configure multer for photo uploads
 const storage = multer.diskStorage({
@@ -42,14 +43,16 @@ const requireAuth = (req, res, next) => {
 // GET ALL CLEANING JOBS
 // ==============================================
 router.get('/', requireAuth, async (req, res) => {
-    const requestId = `REQ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    console.log(`🔵 [${requestId}] GET /api/cleaning-jobs - User: ${req.session.userType} (ID: ${req.session.userId || req.session.clientId})`);
+    console.log(`🔵 GET /api/cleaning-jobs [${req.correlationId}] - User: ${req.session.userType}`);
 
     try {
-        let query, params;
+        const { limit, offset, sort, order } = validatePagination(req);
+        let query, params, countQuery, countParams;
 
         if (req.session.userType === 'master' || req.session.userType === 'admin') {
             // Master/Admin see all jobs
+            countQuery = 'SELECT COUNT(*) FROM cleaning_jobs';
+            countParams = [];
             query = `
                 SELECT cj.*,
                        c.full_name as client_name, c.phone as client_phone,
@@ -57,46 +60,57 @@ router.get('/', requireAuth, async (req, res) => {
                 FROM cleaning_jobs cj
                 JOIN clients c ON cj.client_id = c.id
                 LEFT JOIN users u ON cj.assigned_worker_id = u.id
-                ORDER BY cj.scheduled_date DESC, cj.scheduled_time DESC
+                ORDER BY cj.scheduled_date ${order}, cj.scheduled_time ${order}
+                LIMIT $1 OFFSET $2
             `;
-            params = [];
+            params = [limit, offset];
         } else if (req.session.userType === 'worker') {
             // Workers see only assigned jobs
+            countQuery = 'SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_worker_id = $1';
+            countParams = [req.session.userId];
             query = `
                 SELECT cj.*,
                        c.full_name as client_name, c.phone as client_phone
                 FROM cleaning_jobs cj
                 JOIN clients c ON cj.client_id = c.id
                 WHERE cj.assigned_worker_id = $1
-                ORDER BY cj.scheduled_date DESC, cj.scheduled_time DESC
+                ORDER BY cj.scheduled_date ${order}, cj.scheduled_time ${order}
+                LIMIT $2 OFFSET $3
             `;
-            params = [req.session.userId];
+            params = [req.session.userId, limit, offset];
         } else if (req.session.userType === 'client') {
             // Clients see only their jobs
+            countQuery = 'SELECT COUNT(*) FROM cleaning_jobs WHERE client_id = $1';
+            countParams = [req.session.clientId];
             query = `
                 SELECT cj.*,
                        u.full_name as worker_name
                 FROM cleaning_jobs cj
                 LEFT JOIN users u ON cj.assigned_worker_id = u.id
                 WHERE cj.client_id = $1
-                ORDER BY cj.scheduled_date DESC, cj.scheduled_time DESC
+                ORDER BY cj.scheduled_date ${order}, cj.scheduled_time ${order}
+                LIMIT $2 OFFSET $3
             `;
-            params = [req.session.clientId];
+            params = [req.session.clientId, limit, offset];
         } else {
-            return res.status(403).json({ error: 'Access denied' });
+            return errorResponse(res, 403, 'Access denied', 'FORBIDDEN', req);
         }
 
-        console.log(`🔵 [${requestId}] Executing query - Filter: ${req.session.userType}, Params: ${JSON.stringify(params)}`);
-        const result = await pool.query(query, params);
-        console.log(`✅ [${requestId}] Success - Returned ${result.rows.length} jobs`);
+        const [result, countResult] = await Promise.all([
+            pool.query(query, params),
+            pool.query(countQuery, countParams)
+        ]);
 
-        res.json({
-            _meta: { requestId, timestamp: new Date().toISOString(), count: result.rows.length },
-            data: result.rows
-        });
+        console.log(`✅ Cleaning jobs fetched [${req.correlationId}]: ${result.rows.length} of ${countResult.rows[0].count}`);
+
+        return listResponse(res, result.rows, {
+            total: parseInt(countResult.rows[0].count),
+            limit,
+            offset
+        }, req);
     } catch (error) {
-        console.error(`❌ [${requestId}] Error fetching cleaning jobs:`, error.message);
-        res.status(500).json({ error: 'Server error', requestId });
+        console.error(`❌ Error fetching cleaning jobs [${req.correlationId}]:`, error.message);
+        return errorResponse(res, 500, 'Server error', 'SERVER_ERROR', req);
     }
 });
 

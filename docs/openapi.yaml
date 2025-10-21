@@ -1,0 +1,681 @@
+openapi: 3.1.0
+info:
+  title: Lavandaria Management System API
+  version: 2.0.0
+  description: |
+    Dual-business management system for laundry service and Airbnb/house cleaning.
+
+    **Authentication**: Session-based (cookie `connect.sid`)
+
+    **Response Envelope**: All list endpoints return `{success, data, _meta}`
+
+    **Pagination**: Default limit=50, max=100
+
+    **Correlation IDs**: All responses include `_meta.correlationId` and `X-Correlation-Id` header
+  contact:
+    name: Lavandaria Support
+    email: support@lavandaria.example.com
+  license:
+    name: Private
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development
+  - url: https://lavandaria.example.com/api
+    description: Production
+
+components:
+  schemas:
+    Meta:
+      type: object
+      properties:
+        correlationId:
+          type: string
+          example: req_1760046060891_8c38a1k45
+        timestamp:
+          type: string
+          format: date-time
+          example: '2025-10-09T22:00:00.000Z'
+        total:
+          type: integer
+          description: Total records matching query
+          example: 150
+        limit:
+          type: integer
+          description: Page size (max 100)
+          example: 50
+        offset:
+          type: integer
+          description: Records skipped
+          example: 0
+        count:
+          type: integer
+          description: Records in current page
+          example: 50
+
+    ListEnvelope:
+      type: object
+      required: [success, data, _meta]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items: {}
+        _meta:
+          $ref: '#/components/schemas/Meta'
+
+    ErrorResponse:
+      type: object
+      required: [error, _meta]
+      properties:
+        error:
+          type: string
+          example: Server error
+        code:
+          type: string
+          example: SERVER_ERROR
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+              value: {}
+        _meta:
+          type: object
+          properties:
+            correlationId:
+              type: string
+            timestamp:
+              type: string
+              format: date-time
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: master
+        role:
+          type: string
+          enum: [master, admin, worker]
+          example: master
+        full_name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    Client:
+      type: object
+      properties:
+        id:
+          type: integer
+        phone:
+          type: string
+          example: '911111111'
+        full_name:
+          type: string
+        email:
+          type: string
+        address_line1:
+          type: string
+        city:
+          type: string
+        postal_code:
+          type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    CleaningJob:
+      type: object
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        assigned_worker_id:
+          type: integer
+        property_name:
+          type: string
+        address_line1:
+          type: string
+        city:
+          type: string
+        scheduled_date:
+          type: string
+          format: date
+        scheduled_time:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed, cancelled]
+        total_price:
+          type: number
+          format: decimal
+        created_at:
+          type: string
+          format: date-time
+
+    LaundryOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+        order_number:
+          type: string
+          example: LDR-20251009-001
+        client_id:
+          type: integer
+        assigned_worker_id:
+          type: integer
+        status:
+          type: string
+          enum: [pending, processing, ready, delivered, cancelled]
+        total_price:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+        client_id:
+          type: integer
+        order_type:
+          type: string
+          enum: [laundry, airbnb]
+        order_id:
+          type: integer
+        amount:
+          type: number
+          format: decimal
+        payment_method:
+          type: string
+          enum: [cash, card, bank_transfer, mbway]
+        payment_date:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      description: Page size (default 50, max 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      example: 25
+
+    Offset:
+      name: offset
+      in: query
+      description: Records to skip
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      example: 0
+
+    Order:
+      name: order
+      in: query
+      description: Sort direction
+      schema:
+        type: string
+        enum: [ASC, DESC]
+        default: DESC
+      example: DESC
+
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Authentication required
+            _meta:
+              correlationId: req_1760046060891_8c38a1k45
+              timestamp: '2025-10-09T22:00:00.000Z'
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Access denied
+            code: FORBIDDEN
+            _meta:
+              correlationId: req_1760046060891_8c38a1k45
+              timestamp: '2025-10-09T22:00:00.000Z'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Server error
+            code: SERVER_ERROR
+            _meta:
+              correlationId: req_1760046060891_8c38a1k45
+              timestamp: '2025-10-09T22:00:00.000Z'
+
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: string
+                example: RATE_LIMIT_EXCEEDED
+              retryAfter:
+                type: integer
+                description: Seconds until retry allowed
+              _meta:
+                type: object
+          example:
+            error: Too many login attempts from this IP, please try again after 15 minutes
+            code: RATE_LIMIT_EXCEEDED
+            retryAfter: 900
+            _meta:
+              correlationId: req_1760046060891_8c38a1k45
+              timestamp: '2025-10-09T22:00:00.000Z'
+
+paths:
+  /auth/login/user:
+    post:
+      summary: Staff login (Master/Admin/Worker)
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+            example:
+              username: master
+              password: master123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              example:
+                success: true
+                user:
+                  id: 1
+                  username: master
+                  role: master
+                  name: John Doe
+                _meta:
+                  correlationId: req_1760046060891_8c38a1k45
+                  timestamp: '2025-10-09T22:00:00.000Z'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              example:
+                error: Invalid credentials
+                _meta:
+                  correlationId: req_1760046060891_8c38a1k45
+                  timestamp: '2025-10-09T22:00:00.000Z'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/login/client:
+    post:
+      summary: Client login
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, password]
+              properties:
+                phone:
+                  type: string
+                password:
+                  type: string
+            example:
+              phone: '911111111'
+              password: lavandaria2025
+      responses:
+        '200':
+          description: Login successful
+        '401':
+          description: Invalid credentials
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/check:
+    get:
+      summary: Check session status
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Session status
+          content:
+            application/json:
+              example:
+                authenticated: true
+                userType: master
+                userName: John Doe
+                userId: 1
+
+  /auth/logout:
+    post:
+      summary: Logout
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Logout successful
+
+  /users:
+    get:
+      summary: List users (Master/Admin only)
+      tags: [Users]
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Order'
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/User'
+              example:
+                success: true
+                data:
+                  - id: 1
+                    username: master
+                    role: master
+                    full_name: John Doe
+                  - id: 2
+                    username: admin
+                    role: admin
+                    full_name: Jane Smith
+                _meta:
+                  correlationId: req_1760046060891_8c38a1k45
+                  timestamp: '2025-10-09T22:00:00.000Z'
+                  total: 10
+                  limit: 50
+                  offset: 0
+                  count: 2
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /clients:
+    get:
+      summary: List clients (Staff only)
+      tags: [Clients]
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Order'
+      responses:
+        '200':
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Client'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cleaning-jobs:
+    get:
+      summary: List cleaning jobs
+      tags: [Cleaning Jobs]
+      description: |
+        Master/Admin see all, Workers see assigned, Clients see own
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Order'
+      responses:
+        '200':
+          description: List of cleaning jobs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CleaningJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /laundry-orders:
+    get:
+      summary: List laundry orders
+      tags: [Laundry Orders]
+      description: |
+        Master/Admin see all, Workers see all (processing), Clients see own
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Order'
+      responses:
+        '200':
+          description: List of laundry orders
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LaundryOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /payments:
+    get:
+      summary: List payments (Finance access only)
+      tags: [Payments]
+      description: |
+        Master and Admin only. Workers do NOT have access.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Order'
+      responses:
+        '200':
+          description: List of payments
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      summary: Record payment
+      tags: [Payments]
+      description: |
+        Validates that order exists before creating payment (prevents orphans)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id, order_type, order_id, amount, payment_method, payment_date]
+              properties:
+                client_id:
+                  type: integer
+                order_type:
+                  type: string
+                  enum: [laundry, airbnb]
+                order_id:
+                  type: integer
+                amount:
+                  type: number
+                payment_method:
+                  type: string
+                  enum: [cash, card, bank_transfer, mbway]
+                payment_date:
+                  type: string
+                  format: date-time
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Payment recorded
+        '400':
+          description: Validation error or order not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /airbnb:
+    get:
+      deprecated: true
+      summary: '[DEPRECATED] Use /cleaning-jobs instead'
+      tags: [Deprecated]
+      description: |
+        **Status**: 410 Gone (Cutover: 2025-10-08)
+
+        **Replacement**: GET /cleaning-jobs
+
+        This endpoint has been migrated to the new jobs system.
+      responses:
+        '410':
+          description: Permanently moved
+          content:
+            application/json:
+              example:
+                error: Endpoint permanently moved
+                message: This API endpoint has been migrated to the new system.
+                newEndpoint: /cleaning-jobs
+                migration: All cleaning operations now use /cleaning-jobs
+                timestamp: '2025-10-09T22:00:00.000Z'
+
+  /laundry:
+    get:
+      deprecated: true
+      summary: '[DEPRECATED] Use /laundry-orders instead'
+      tags: [Deprecated]
+      description: |
+        **Status**: 410 Gone (Cutover: 2025-10-08)
+
+        **Replacement**: GET /laundry-orders
+      responses:
+        '410':
+          description: Permanently moved
+
+  /services:
+    get:
+      deprecated: true
+      summary: '[DEPRECATED] Use /laundry-services instead'
+      tags: [Deprecated]
+      description: |
+        **Status**: 410 Gone (Cutover: 2025-10-08)
+
+        **Replacement**: GET /laundry-services
+      responses:
+        '410':
+          description: Permanently moved
+
+tags:
+  - name: Authentication
+    description: Session-based auth with rate limiting (5 attempts/15min)
+  - name: Users
+    description: Staff management (Master/Admin only)
+  - name: Clients
+    description: Customer management
+  - name: Cleaning Jobs
+    description: Airbnb/house cleaning orders (NEW system)
+  - name: Laundry Orders
+    description: Laundry service orders (NEW system)
+  - name: Payments
+    description: Financial tracking (Finance access only)
+  - name: Deprecated
+    description: Legacy endpoints (return 410 Gone)

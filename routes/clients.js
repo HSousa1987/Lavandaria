@@ -3,48 +3,39 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const { pool } = require('../config/database');
 const { requireMasterOrAdmin, requireStaff, canManageUsers } = require('../middleware/permissions');
+const { listResponse, validatePagination, errorResponse } = require('../middleware/validation');
 
 // Get all clients (All staff can view as contacts, but only Master/Admin can manage)
 router.get('/', requireStaff, async (req, res) => {
-    console.log('🔵 ============================================');
-    console.log('🔵 GET /api/clients - START');
-    console.log('🔵 User:', req.session.userType, 'ID:', req.session.userId);
-    console.log('🔵 ============================================');
+    console.log(`🔵 GET /api/clients [${req.correlationId}] - User: ${req.session.userType}`);
 
     try {
+        const { limit, offset, sort, order } = validatePagination(req);
+
         const query = `SELECT id, phone, full_name, first_name, last_name, email, date_of_birth, nif,
                     address_line1, address_line2, city, postal_code, district, country,
                     notes, is_enterprise, company_name, registration_date, created_at, is_active
-             FROM clients ORDER BY created_at DESC`;
+             FROM clients
+             ORDER BY created_at ${order}
+             LIMIT $1 OFFSET $2`;
 
-        console.log('🔵 Executing query:', query.substring(0, 100) + '...');
+        const countQuery = 'SELECT COUNT(*) FROM clients';
 
-        const result = await pool.query(query);
+        const [result, countResult] = await Promise.all([
+            pool.query(query, [limit, offset]),
+            pool.query(countQuery)
+        ]);
 
-        console.log('✅ Query successful! Rows returned:', result.rows.length);
-        if (result.rows.length > 0) {
-            console.log('✅ First client sample:', {
-                id: result.rows[0].id,
-                phone: result.rows[0].phone,
-                full_name: result.rows[0].full_name,
-                has_address_line1: !!result.rows[0].address_line1,
-                has_city: !!result.rows[0].city,
-                has_postal_code: !!result.rows[0].postal_code
-            });
-        }
-        console.log('🔵 ============================================\n');
+        console.log(`✅ Clients fetched [${req.correlationId}]: ${result.rows.length} of ${countResult.rows[0].count}`);
 
-        res.json(result.rows);
+        return listResponse(res, result.rows, {
+            total: parseInt(countResult.rows[0].count),
+            limit,
+            offset
+        }, req);
     } catch (error) {
-        console.error('❌ ============================================');
-        console.error('❌ ERROR in GET /api/clients');
-        console.error('❌ Error name:', error.name);
-        console.error('❌ Error message:', error.message);
-        console.error('❌ Error code:', error.code);
-        console.error('❌ Error position:', error.position);
-        console.error('❌ Full error:', error);
-        console.error('❌ ============================================\n');
-        res.status(500).json({ error: 'Server error' });
+        console.error(`❌ Error fetching clients [${req.correlationId}]:`, error.message);
+        return errorResponse(res, 500, 'Server error', 'SERVER_ERROR', req);
     }
 });
 

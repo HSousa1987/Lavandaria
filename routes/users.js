@@ -3,15 +3,18 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const { pool } = require('../config/database');
 const { requireMaster, requireMasterOrAdmin, requireStaff } = require('../middleware/permissions');
+const { listResponse, validatePagination, errorResponse } = require('../middleware/validation');
 
 // Get all users (staff)
 // Master sees all, Admin sees workers only
 router.get('/', requireMasterOrAdmin, async (req, res) => {
     try {
-        let query, params;
+        const { limit, offset, sort, order } = validatePagination(req);
+        let query, params, countQuery;
 
         if (req.session.userType === 'master') {
             // Master sees everyone
+            countQuery = 'SELECT COUNT(*) FROM users';
             query = `
                 SELECT u.id, u.username, u.role, u.full_name, u.first_name, u.last_name, u.email, u.phone,
                        u.date_of_birth, u.nif, u.address_line1, u.address_line2, u.city, u.postal_code, u.district, u.country,
@@ -24,27 +27,38 @@ router.get('/', requireMasterOrAdmin, async (req, res) => {
                         WHEN 'admin' THEN 2
                         WHEN 'worker' THEN 3
                     END,
-                    u.created_at DESC
+                    u.created_at ${order}
+                LIMIT $1 OFFSET $2
             `;
-            params = [];
+            params = [limit, offset];
         } else {
             // Admin sees only workers
+            countQuery = "SELECT COUNT(*) FROM users WHERE role = 'worker'";
             query = `
                 SELECT id, username, role, full_name, first_name, last_name, email, phone,
                        date_of_birth, nif, address_line1, address_line2, city, postal_code, district, country,
                        registration_date, created_at, is_active
                 FROM users
                 WHERE role = 'worker'
-                ORDER BY created_at DESC
+                ORDER BY created_at ${order}
+                LIMIT $1 OFFSET $2
             `;
-            params = [];
+            params = [limit, offset];
         }
 
-        const result = await pool.query(query, params);
-        res.json(result.rows);
+        const [result, countResult] = await Promise.all([
+            pool.query(query, params),
+            pool.query(countQuery)
+        ]);
+
+        return listResponse(res, result.rows, {
+            total: parseInt(countResult.rows[0].count),
+            limit,
+            offset
+        }, req);
     } catch (error) {
-        console.error('Error fetching users:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error(`Error fetching users [${req.correlationId}]:`, error);
+        return errorResponse(res, 500, 'Server error', 'SERVER_ERROR', req);
     }
 });
 

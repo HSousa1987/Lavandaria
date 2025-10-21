@@ -1,0 +1,257 @@
+#!/bin/bash
+
+# Lavandaria Deployment Script
+# This script will deploy the entire application with one command
+#
+# ⚠️  IMPORTANT: Always deploy using ./deploy.sh
+#    Do NOT use 'docker compose up -d' directly - it will skip migrations!
+
+set -e
+
+echo "🚀 Starting Lavandaria Deployment..."
+echo "=================================="
+
+# Detect docker compose command (v2 plugin vs v1 standalone)
+if docker compose version &> /dev/null; then
+    COMPOSE_CMD="docker compose"
+    echo "✅ Using Docker Compose v2 (plugin)"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+    echo "✅ Using Docker Compose v1"
+else
+    echo "❌ Docker Compose is not installed. Please install Docker Compose."
+    exit 1
+fi
+
+# Check if Docker is installed
+if ! command -v docker &> /dev/null; then
+    echo "❌ Docker is not installed. Please install Docker first."
+    exit 1
+fi
+
+# Check if Docker is running
+if ! docker info &> /dev/null; then
+    echo "❌ Docker is not running. Please start Docker first."
+    exit 1
+fi
+
+echo "✅ Docker is installed and running"
+echo ""
+
+# Create necessary directories
+echo "📁 Creating necessary directories..."
+mkdir -p uploads/cleaning_photos logs letsencrypt
+chmod 755 uploads logs
+chmod 700 letsencrypt
+echo "✅ Directories created"
+echo ""
+
+# Check if .env exists
+if [ ! -f .env ]; then
+    echo "⚠️  .env file not found!"
+
+    if [ -f .env.example ]; then
+        echo "📝 Copying .env.example to .env..."
+        cp .env.example .env
+    elif [ -f .env.production ]; then
+        echo "📝 Copying .env.production to .env..."
+        cp .env.production .env
+    else
+        echo "❌ No .env template found. Creating minimal .env..."
+        cat > .env <<EOF
+NODE_ENV=production
+DB_HOST=db
+DB_PORT=5432
+DB_USER=lavandaria
+DB_PASSWORD=lavandaria2025
+DB_NAME=lavandaria
+PORT=3000
+SESSION_SECRET=REPLACE_WITH_64_CHAR_HEX
+CORS_ORIGINS=http://localhost:3000
+COOKIE_SECURE=false
+EOF
+    fi
+
+    echo "📝 Created .env file from template"
+    echo ""
+    echo "⚠️  IMPORTANT: You must configure .env before deployment!"
+    echo "   1. Generate SESSION_SECRET (required)"
+    echo "   2. Update CORS_ORIGINS with your domain"
+    echo "   3. Set COOKIE_SECURE=true for HTTPS (false for HTTP testing)"
+    echo ""
+    exit 1
+fi
+
+# Validate required environment variables
+echo "🔍 Validating environment configuration..."
+
+# Check SESSION_SECRET exists and is strong
+if ! grep -q "^SESSION_SECRET=" .env || grep -q "^SESSION_SECRET=$" .env || grep -q "REPLACE_WITH" .env; then
+    echo "⚠️  SESSION_SECRET is missing or using placeholder!"
+    echo ""
+    echo "Generating secure SESSION_SECRET..."
+
+    # Generate SESSION_SECRET using Node.js (or fallback to openssl/urandom)
+    if command -v node &> /dev/null; then
+        SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+    elif command -v openssl &> /dev/null; then
+        SESSION_SECRET=$(openssl rand -hex 32)
+    else
+        # Fallback: use /dev/urandom (portable, no network required)
+        SESSION_SECRET=$(head -c 32 /dev/urandom | xxd -p -c 64)
+    fi
+
+    # Update .env file
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        sed -i '' "s/^SESSION_SECRET=.*/SESSION_SECRET=$SESSION_SECRET/" .env
+    else
+        # Linux
+        sed -i "s/^SESSION_SECRET=.*/SESSION_SECRET=$SESSION_SECRET/" .env
+    fi
+
+    echo "✅ Generated SESSION_SECRET: ${SESSION_SECRET:0:16}... (truncated for security)"
+    echo ""
+else
+    # Validate SESSION_SECRET length (minimum 32 chars)
+    SESSION_SECRET=$(grep "^SESSION_SECRET=" .env | cut -d'=' -f2)
+    if [ ${#SESSION_SECRET} -lt 32 ]; then
+        echo "❌ SESSION_SECRET is too weak (minimum 32 characters required)"
+        echo "   Generate a strong secret with:"
+        echo "   node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+        echo ""
+        exit 1
+    fi
+    echo "✅ SESSION_SECRET validated (${#SESSION_SECRET} characters)"
+fi
+
+# Check CORS_ORIGINS is configured
+if ! grep -q "^CORS_ORIGINS=" .env || grep -q "yourdomain.com" .env; then
+    echo "⚠️  Warning: CORS_ORIGINS still contains placeholder domain"
+    echo "   Update CORS_ORIGINS in .env with your actual domain(s)"
+    echo "   Example: CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com"
+    echo ""
+fi
+
+# Check NODE_ENV
+if ! grep -q "^NODE_ENV=production" .env; then
+    echo "⚠️  Warning: NODE_ENV is not set to 'production'"
+    echo "   Current environment may use development settings"
+    echo ""
+fi
+
+echo "✅ Environment validation complete"
+echo ""
+
+# Stop existing containers
+echo "🛑 Stopping existing containers..."
+$COMPOSE_CMD down
+
+echo ""
+echo "🏗️  Building Docker images..."
+$COMPOSE_CMD build --no-cache
+
+echo ""
+echo "🚀 Starting containers..."
+$COMPOSE_CMD up -d
+
+echo ""
+echo "⏳ Waiting for database to be ready..."
+sleep 5
+
+# Wait for database health check
+for i in {1..30}; do
+    if $COMPOSE_CMD ps db | grep -q "healthy"; then
+        echo "✅ Database is healthy"
+        break
+    fi
+    echo "   Waiting for database... ($i/30)"
+    sleep 2
+done
+
+echo ""
+echo "🗄️  Running database migrations..."
+
+# Run migrations in order
+MIGRATIONS=(
+    "database/migrations/000_add_user_client_extended_fields.sql"
+    "database/migrations/001_standardize_address_fields.sql"
+    "database/migrations/002_create_new_jobs_system.sql"
+    "database/migrations/003_add_pricing_and_settings.sql"
+)
+
+for migration in "${MIGRATIONS[@]}"; do
+    if [ -f "$migration" ]; then
+        echo "   Running: $(basename $migration)"
+        cat "$migration" | docker exec -i lavandaria-db psql -U lavandaria -d lavandaria -q 2>&1 | grep -v "NOTICE:" || true
+    fi
+done
+
+echo "✅ Migrations completed"
+echo ""
+
+echo "⏳ Waiting for application to be ready..."
+sleep 10
+
+# Check application health
+for i in {1..20}; do
+    if docker exec lavandaria-app wget --no-verbose --tries=1 --spider http://localhost:3000/api/healthz 2>&1 | grep -q "200 OK"; then
+        echo "✅ Application is healthy"
+        break
+    fi
+    echo "   Waiting for application... ($i/20)"
+    sleep 3
+done
+
+echo ""
+echo "=========================================="
+echo "✅ Deployment Complete!"
+echo "=========================================="
+echo ""
+
+# Detect deployment mode
+if grep -q "traefik.enable=true" docker-compose*.yml 2>/dev/null; then
+    DOMAIN=$(grep "CORS_ORIGINS=" .env | cut -d'=' -f2 | cut -d',' -f1 | sed 's/https\?:\/\///')
+    echo "🌐 Application URL: https://$DOMAIN"
+    echo "📚 API Docs: https://$DOMAIN/api/docs"
+    echo "🏥 Health Check: https://$DOMAIN/api/healthz"
+else
+    echo "🌐 Application URL: http://localhost:3000"
+    echo "📚 API Docs: http://localhost:3000/api/docs"
+    echo "🏥 Health Check: http://localhost:3000/api/healthz"
+fi
+
+echo ""
+echo "👤 Default Credentials:"
+echo "   Master: master / master123"
+echo "   Admin:  admin / admin123"
+echo "   Worker: worker1 / worker123"
+echo "   Client: 911111111 / lavandaria2025"
+echo ""
+echo "⚠️  IMPORTANT: Change all passwords after first login!"
+echo ""
+
+echo "📋 Post-Deployment Verification:"
+echo ""
+echo "   # Check container health"
+echo "   $COMPOSE_CMD ps"
+echo ""
+echo "   # View application logs"
+echo "   $COMPOSE_CMD logs -f app"
+echo ""
+echo "   # Test health endpoints"
+echo "   curl http://localhost:3000/api/healthz"
+echo "   curl http://localhost:3000/api/readyz"
+echo ""
+echo "   # Check database connection"
+echo "   docker exec -it lavandaria-db psql -U lavandaria -d lavandaria -c 'SELECT COUNT(*) FROM users;'"
+echo ""
+
+echo "📖 Documentation:"
+echo "   - Operations: OPERATIONS_RUNBOOK.md"
+echo "   - Monitoring: MONITORING.md"
+echo "   - Weekly Checks: VALIDATION_CHECKLIST.md"
+echo ""
+
+echo "🎉 Lavandaria is ready for production!"
+echo ""

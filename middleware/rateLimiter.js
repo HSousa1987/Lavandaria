@@ -17,13 +17,7 @@ const loginLimiter = rateLimit({
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count all requests
   skipFailedRequests: false,
-  // Use default memory store (works across all environments)
-  keyGenerator: (req) => {
-    // Use IP address as the key for rate limiting
-    const ip = req.ip || req.connection.remoteAddress || 'unknown';
-    console.log(`🔍 [RATE-LIMIT] Request from IP: ${ip}`);
-    return ip;
-  },
+  // Use default IPv6-safe IP resolution (trust proxy must be enabled in server.js)
   handler: (req, res) => {
     const correlationId = req.correlationId || req.headers['x-correlation-id'] || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
