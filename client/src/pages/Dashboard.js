@@ -625,8 +625,11 @@ const Dashboard = () => {
         {/* Tabs */}
         <div className="bg-white rounded-lg shadow mb-6">
           <div className="border-b border-gray-200">
-            <nav className="flex -mb-px">
+            <nav className="flex -mb-px" role="tablist">
               <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'overview' ? 'true' : 'false'}
                 onClick={() => setActiveTab('overview')}
                 className={`px-6 py-3 border-b-2 font-medium text-sm ${
                   activeTab === 'overview'
@@ -640,6 +643,9 @@ const Dashboard = () => {
               {(isMaster || isAdmin) && (
                 <>
                   <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'users' ? 'true' : 'false'}
                     onClick={() => setActiveTab('users')}
                     className={`px-6 py-3 border-b-2 font-medium text-sm ${
                       activeTab === 'users'
@@ -650,6 +656,9 @@ const Dashboard = () => {
                     {isMaster ? 'All Users' : 'Workers'}
                   </button>
                   <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'clients' ? 'true' : 'false'}
                     onClick={() => setActiveTab('clients')}
                     className={`px-6 py-3 border-b-2 font-medium text-sm ${
                       activeTab === 'clients'
@@ -663,6 +672,9 @@ const Dashboard = () => {
               )}
 
               <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'jobs' ? 'true' : 'false'}
                 onClick={() => setActiveTab('jobs')}
                 className={`px-6 py-3 border-b-2 font-medium text-sm ${
                   activeTab === 'jobs'
@@ -674,6 +686,9 @@ const Dashboard = () => {
               </button>
 
               <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'cleaningJobs' ? 'true' : 'false'}
                 onClick={() => setActiveTab('cleaningJobs')}
                 className={`px-6 py-3 border-b-2 font-medium text-sm ${
                   activeTab === 'cleaningJobs'
@@ -685,6 +700,9 @@ const Dashboard = () => {
               </button>
 
               <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'laundryOrders' ? 'true' : 'false'}
                 onClick={() => setActiveTab('laundryOrders')}
                 className={`px-6 py-3 border-b-2 font-medium text-sm ${
                   activeTab === 'laundryOrders'
@@ -697,6 +715,9 @@ const Dashboard = () => {
 
               {isWorker && (
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'contacts' ? 'true' : 'false'}
                   onClick={() => setActiveTab('contacts')}
                   className={`px-6 py-3 border-b-2 font-medium text-sm ${
                     activeTab === 'contacts'

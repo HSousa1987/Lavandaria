@@ -15,6 +15,7 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
     testDir: './tests/e2e',
+    testMatch: '**/*.spec.js', // Only match .spec.js files in testDir
     // Maximum time one test can run for
     timeout: 60 * 1000,
     expect: {
@@ -108,10 +109,11 @@ module.exports = defineConfig({
     ],
 
     // Run your local dev server before starting the tests
+    // Note: We use Docker Compose for the server, so we reuse the existing server
     webServer: {
-        command: 'npm start',
+        command: 'echo "Using existing Docker server"',
         url: 'http://localhost:3000/api/healthz',
-        reuseExistingServer: !process.env.CI,
+        reuseExistingServer: true, // Always reuse (Docker is already running)
         timeout: 120 * 1000,
         stdout: 'pipe',
         stderr: 'pipe'
