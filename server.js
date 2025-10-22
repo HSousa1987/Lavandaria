@@ -201,8 +201,56 @@ if (process.env.NODE_ENV === 'production') {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+    // Debug: Log error details
+    console.log(`🔍 [ERROR DEBUG] Error name: ${err.name}, Constructor: ${err.constructor.name}, Message: ${err.message}`);
+
+    // Handle Multer errors (file upload)
+    if (err.name === 'MulterError' || err.constructor.name === 'MulterError') {
+        console.error(`❌ [MULTER ERROR] ${err.message} [${req.correlationId}]`);
+
+        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+            // Too many files uploaded (exceeds array limit)
+            return res.status(400).json({
+                error: 'Maximum 10 photos per upload batch',
+                code: 'BATCH_LIMIT_EXCEEDED',
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({
+                error: 'File too large (max 10MB per file)',
+                code: 'FILE_TOO_LARGE',
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+
+        // Other multer errors
+        return res.status(400).json({
+            error: err.message,
+            code: 'UPLOAD_ERROR',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+
+    // Generic error handler
     console.error(err.stack);
-    res.status(500).json({ error: 'Something went wrong!' });
+    res.status(500).json({
+        error: 'Something went wrong!',
+        _meta: {
+            correlationId: req.correlationId,
+            timestamp: new Date().toISOString()
+        }
+    });
 });
 
 // Start server
