@@ -38,10 +38,14 @@ function createTestImage(filename, sizeKB = 100) {
 // Helper to login as worker
 async function loginAsWorker(page) {
     await page.goto('/');
+    // Login form is visible by default (login-first UX)
+    // Select Staff tab
+    await page.click('button:has-text("Staff")');
     await page.fill('input[name="username"]', WORKER_CREDENTIALS.username);
     await page.fill('input[name="password"]', WORKER_CREDENTIALS.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL('/worker', { timeout: 10000 });
+    // All users navigate to /dashboard after login
+    await page.waitForURL('/dashboard', { timeout: 10000 });
 }
 
 // Helper to get test job ID via API

@@ -10,11 +10,12 @@ test.describe('Dashboard Tab Navigation', () => {
   test.beforeEach(async ({ page }) => {
     // Login as worker
     await page.goto('http://localhost:3000');
-    await page.click('button:has-text("Login")');
+    // Login form is visible by default (login-first UX)
+    // Select Staff tab
     await page.click('button:has-text("Staff")');
     await page.fill('input[name="username"]', 'worker1');
     await page.fill('input[name="password"]', 'worker123');
-    await page.click('button:has-text("Login")');
+    await page.click('button[type="submit"]');
     await page.waitForURL('**/dashboard');
   });
 
