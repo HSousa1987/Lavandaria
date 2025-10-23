@@ -190,14 +190,14 @@ app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/settings', require('./routes/settings'));
 
-// Serve React app in production
-if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, 'client/build')));
+// Serve React app (production build for E2E testing compatibility)
+// Note: In development, client may run separately on port 3001
+const buildPath = path.join(__dirname, 'client/build');
+app.use(express.static(buildPath));
 
-    app.get('*', (req, res) => {
-        res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-    });
-}
+app.get('*', (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
