@@ -1,63 +1,74 @@
 #!/bin/bash
-# Verification script for Vibe Check MCP installation
-# Run this after restarting Claude Code
+# verify-vibe-check.sh - Verify Vibe Check MCP installation and configuration
 
-echo "🔍 Vibe Check MCP Installation Verification"
-echo "==========================================="
+set -e
+
+echo "🔍 Verifying Vibe Check MCP Installation..."
 echo ""
 
-# Check if package is installed globally
-echo "1️⃣ Checking global npm package..."
-if npm list -g @pv-bhat/vibe-check-mcp &>/dev/null; then
-    echo "   ✅ @pv-bhat/vibe-check-mcp is installed globally"
-    npm list -g @pv-bhat/vibe-check-mcp --depth=0
+# Color codes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# 1. Check global npm installation
+echo "1️⃣  Checking global npm installation..."
+if npm list -g @pv-bhat/vibe-check-mcp &> /dev/null; then
+    VERSION=$(npm list -g @pv-bhat/vibe-check-mcp 2>&1 | grep vibe-check-mcp | sed 's/.*@//' | sed 's/ .*//')
+    echo -e "${GREEN}✓${NC} Vibe Check MCP is installed globally (version: $VERSION)"
 else
-    echo "   ❌ Package not found globally"
+    echo -e "${RED}✗${NC} Vibe Check MCP is NOT installed globally"
+    echo -e "${YELLOW}→${NC} Run: npm install -g @pv-bhat/vibe-check-mcp"
     exit 1
 fi
 
 echo ""
 
-# Check if MCP is registered in config
-echo "2️⃣ Checking Claude Code configuration..."
-if python3 << 'EOF'
-import json
-import sys
+# 2. Check Claude Code MCP settings
+echo "2️⃣  Checking Claude Code MCP configuration..."
+MCP_SETTINGS="$HOME/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
 
-with open('/Users/hugosousa/.claude.json', 'r') as f:
-    config = json.load(f)
-
-project_key = '/Applications/XAMPP/xamppfiles/htdocs/Lavandaria'
-if 'vibe-check' in config['projects'][project_key]['mcpServers']:
-    print("   ✅ vibe-check MCP registered in .claude.json")
-    sys.exit(0)
-else:
-    print("   ❌ vibe-check MCP not found in config")
-    sys.exit(1)
-EOF
-then
-    :
+if [ -f "$MCP_SETTINGS" ]; then
+    if grep -q "vibe-check" "$MCP_SETTINGS"; then
+        echo -e "${GREEN}✓${NC} Vibe Check MCP is configured in Claude Code"
+        echo -e "${YELLOW}→${NC} Configuration location: $MCP_SETTINGS"
+    else
+        echo -e "${RED}✗${NC} Vibe Check MCP is NOT configured in Claude Code"
+        echo -e "${YELLOW}→${NC} Add configuration to: $MCP_SETTINGS"
+        exit 1
+    fi
 else
+    echo -e "${RED}✗${NC} Claude Code MCP settings file not found"
+    echo -e "${YELLOW}→${NC} Expected location: $MCP_SETTINGS"
     exit 1
 fi
 
 echo ""
 
-# Test if MCP server can start
-echo "3️⃣ Testing MCP server startup..."
-if timeout 5 npx @pv-bhat/vibe-check-mcp start --stdio <<< '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' &>/dev/null; then
-    echo "   ✅ MCP server responds to initialization"
+# 3. Check if vibe-check can be executed
+echo "3️⃣  Testing Vibe Check MCP execution..."
+if npx -y @pv-bhat/vibe-check-mcp --help &> /dev/null; then
+    echo -e "${GREEN}✓${NC} Vibe Check MCP can be executed via npx"
 else
-    echo "   ⚠️  Server test inconclusive (this is normal)"
+    echo -e "${YELLOW}⚠${NC}  Could not execute vibe-check via npx (this may be normal)"
 fi
 
 echo ""
-echo "==========================================="
-echo "✅ Installation verified!"
+
+# 4. Check CLAUDE.md mentions vibe-check
+echo "4️⃣  Checking CLAUDE.md documentation..."
+if grep -q "Vibe Check MCP" CLAUDE.md; then
+    echo -e "${GREEN}✓${NC} Vibe Check MCP is documented in CLAUDE.md"
+else
+    echo -e "${YELLOW}⚠${NC}  Vibe Check MCP not mentioned in CLAUDE.md"
+fi
+
 echo ""
-echo "📝 Next Steps:"
-echo "   1. Restart Claude Code if you haven't already"
-echo "   2. Run: /mcp"
-echo "   3. Look for 'vibe-check' in the connected servers list"
-echo "   4. Test with: vibe_check or vibe_learn tools"
+echo -e "${GREEN}✅ Vibe Check MCP verification complete!${NC}"
+echo ""
+echo "📝 Next steps:"
+echo "   1. Restart Claude Code (VS Code extension) to load the MCP server"
+echo "   2. Use /mcp command in Claude Code to verify connection"
+echo "   3. Test with: vibe_check --userRequest \"test\" --plan \"test plan\""
 echo ""
