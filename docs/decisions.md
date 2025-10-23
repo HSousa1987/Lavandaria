@@ -6,6 +6,79 @@ This log records significant implementation decisions with context, options cons
 
 ---
 
+## 2025-10-23T23:57:00Z - Preflight Health Checks Before E2E Tests
+
+### Context
+After P0 resolution (commit ef0f2eb) where React app wasn't being served (NODE_ENV conditional), realized need for proactive guards against similar deployment config regressions. Without preflight checks, test suite would waste 5-10 minutes running before first timeout, providing poor developer feedback loop.
+
+### Options Considered
+
+**Option 1: Manual preflight verification**
+- Pro: Simple, no tooling needed
+- Con: Developers forget to check
+- Con: No audit trail of pre-test conditions
+
+**Option 2: Inline Playwright preflight checks** ✅
+- Pro: Integrated with test framework
+- Pro: Standard approach in many projects
+- Con: Harder to run standalone
+- Con: Playwright-specific
+
+**Option 3: Dedicated bash script with artifacts** ✅ (chosen)
+- Pro: Terminal-first workflow (matches project culture)
+- Pro: JSON artifacts for debugging
+- Pro: Can run standalone or via npm
+- Pro: Framework-agnostic (works with any test tool)
+- Con: Extra script to maintain
+
+**Option 4: Docker healthcheck only**
+- Pro: Already exists in docker-compose.yml
+- Con: Doesn't validate React app serving
+- Con: No correlation ID tracking
+
+### Decision
+✅ **Dedicated preflight script with JSON artifact collection**
+
+**Implementation**:
+1. Created `scripts/preflight-health-check.sh` with 3 checks:
+   - Root page (/) returns 200 OK with HTML
+   - Health endpoint (/api/healthz) returns 200 OK
+   - Readiness endpoint (/api/readyz) returns 200 OK + DB healthy
+2. Wired into npm scripts:
+   - `test:preflight`: Run standalone
+   - `test:e2e`: Preflight + Playwright
+   - `test:e2e:no-preflight`: Escape hatch
+3. Artifact collection: `preflight-results/*.json`
+4. Fail-fast: Exit code 1 if any check fails
+
+**Design Choices**:
+- Bash over Node.js: Faster startup, simpler dependencies
+- JSON artifacts: Machine-readable for CI/CD integration
+- Color-coded output: Quick visual feedback in terminal
+- Timing data: Helps identify slow health endpoints
+
+### Consequences
+
+**Positive**:
+- ✅ Catches deployment config regressions immediately
+- ✅ Saves developer time (fails in <5s vs 5-10min timeout)
+- ✅ Clear error messages guide to root cause
+- ✅ JSON artifacts useful for debugging flaky tests
+- ✅ Terminal-first workflow aligns with project culture
+
+**Negative**:
+- ⚠️ Extra 1-3 seconds added to test startup time
+- ⚠️ Another script to maintain
+
+**Trade-offs**:
+Chose fast feedback over minimal complexity. The 1-3s preflight cost is negligible compared to 5-10min wasted on doomed test runs.
+
+**Rollback**: Use `npm run test:e2e:no-preflight` if preflight checks block for non-critical reasons
+
+**Links**: Commit b060981, branch ops/preflight-health-and-guard
+
+---
+
 ## 2025-10-23T22:50:00Z - Login-First UX for E2E Tests
 
 ### Context

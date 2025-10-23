@@ -101,6 +101,19 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
   - **Verification**: Manual curl test + full E2E suite execution
   - **Documentation**: Updated [`docs/bugs.md`](bugs.md) with complete RCA
 
+- ✅ **Preflight Health Check System** (2025-10-23 PM)
+  - **Purpose**: Guard against future deployment config regressions
+  - **Implementation**: Bash script with 3 health checks (root page, liveness, readiness)
+  - **Commit**: [`b060981`](https://github.com/HSousa1987/Lavandaria/commit/b060981)
+  - **Branch**: `ops/preflight-health-and-guard`
+  - **Features**:
+    - Color-coded terminal output
+    - JSON artifact collection (`preflight-results/*.json`)
+    - Fail-fast before E2E runs (saves 5-10 min on failures)
+    - Integrated into `npm run test:e2e`
+  - **Escape Hatch**: `npm run test:e2e:no-preflight` for debugging
+  - **Documentation**: Updated [`docs/decisions.md`](decisions.md)
+
 ### Next Steps
 - Merge `docs/bootstrap` branch to main
 - Fix test seed data issues (cleaning jobs, photos)
