@@ -8,7 +8,54 @@ This log tracks bugs discovered, their root causes, fixes applied, and tests add
 
 ## Active Bugs
 
-*None currently tracked*
+### 2025-10-23 - Client Photo Viewing Completely Broken (P0)
+
+**Evidence:**
+- 8/8 E2E tests failing in `tests/e2e/client-photo-viewing.spec.js`
+- Test execution: 2025-10-23 ~01:10-01:13 UTC
+- Playwright artifacts: `test-results/` (screenshots, traces)
+- All client photo viewing scenarios fail:
+  1. ❌ client can view all photos for their own job
+  2. ❌ client can paginate through large photo sets
+  3. ❌ client viewing photos marks them as viewed
+  4. ❌ client receives complete photo count even with many batches
+  5. ❌ client cannot access another client's job photos (SECURITY RISK)
+  6. ❌ worker can access assigned job photos but not unassigned (SECURITY RISK)
+  7. ❌ unauthenticated user cannot access job photos (SECURITY RISK)
+  8. ❌ all responses include correlation IDs
+
+**Root Cause:**
+- INVESTIGATION REQUIRED
+- Suspected: Photo viewing endpoint authentication issue
+- Suspected: `requireClient` middleware not applied correctly
+- Suspected: Session handling for client role broken
+- Suspected: Query-level filtering excluding client role
+
+**Impact:**
+- **P0 BLOCKER**: Blocks production release
+- Clients cannot view job photos (core feature non-functional)
+- RBAC not enforcing isolation (tests #5, #6, #7)
+- Security risk: unauthorized access possible
+- Compliance risk: viewing tracking not working
+
+**Fix Applied:**
+- PENDING - Bug actively being investigated
+
+**Tests Added:**
+- Tests already exist (currently failing)
+- `tests/e2e/client-photo-viewing.spec.js` (8 test cases)
+- Tests cover: viewing, pagination, RBAC, tracking, correlation IDs
+
+**Prevention:**
+- E2E tests will prevent regression once fixed
+- Manual QA checklist: verify client can view own photos
+- Manual QA checklist: verify client cannot view other client's photos
+
+**Links:**
+- Test file: [tests/e2e/client-photo-viewing.spec.js](../tests/e2e/client-photo-viewing.spec.js)
+- Findings: [FULL_SWEEP_FINDINGS.md](../FULL_SWEEP_FINDINGS.md)
+- Linear Issue: (to be created)
+- PR: (to be created)
 
 ---
 
