@@ -6,6 +6,65 @@ This log records significant implementation decisions with context, options cons
 
 ---
 
+## 2025-10-23T22:50:00Z - Login-First UX for E2E Tests
+
+### Context
+After fixing P0 bug (PR #4) where login form was hidden behind toggle, all E2E tests needed updating to align with new login-first UX pattern. Tests were failing because they expected the old hidden-form behavior.
+
+### Options Considered
+
+**Option 1: Revert to hidden-form UX**
+- Pro: No test changes needed
+- Con: Worse user experience (extra click to reach login)
+- Con: Not aligned with product vision
+
+**Option 2: Update tests to click "Login" button** ✅ (chosen)
+- Pro: Tests match actual UX
+- Pro: No more timeout errors
+- Con: Required updating 5 test suites
+- Rationale: Align tests with reality, not force UX to match tests
+
+**Option 3: Keep role-specific post-login routes**
+- Pro: More explicit test assertions
+- Con: App already uses unified `/dashboard` route
+- Con: Would require backend changes for no benefit
+
+### Decision
+✅ **Update all E2E tests to match login-first UX pattern**
+
+**Implementation**:
+1. Remove "Login" button clicks (form visible by default)
+2. Add explicit Client/Staff tab selection
+3. Change route expectations from `/client`, `/worker`, etc. to `/dashboard`
+4. Document all 4 auth flows in [docs/auth-flows.md](docs/auth-flows.md)
+
+**Test Files Updated**:
+- `tests/e2e/client-photo-viewing.spec.js`
+- `tests/e2e/rbac-and-sessions.spec.js`
+- `tests/e2e/tab-navigation.spec.js`
+- `tests/e2e/worker-photo-upload.spec.js`
+- `tests/e2e/debug-tab-navigation.spec.js`
+
+### Consequences
+
+**Positive**:
+- ✅ Tests execute 5x faster (3-4s vs 17s timeout)
+- ✅ No login timeout errors
+- ✅ Auth flows verified for all 4 roles
+- ✅ Comprehensive auth documentation created
+- ✅ Tests align with actual UX (not legacy pattern)
+
+**Negative**:
+- ⚠️ Test maintenance burden (had to update 5 files)
+- ⚠️ Future UX changes require test updates
+
+**Trade-offs**:
+Chose UX consistency over test stability. Better to have tests that match reality and provide real confidence than tests that pass but validate wrong assumptions.
+
+**Links**: PR #5, docs/auth-flows.md
+
+---
+
 ## 2025-10-23T01:45:00Z - Documentation Architecture Bootstrap
 
 ### Context
