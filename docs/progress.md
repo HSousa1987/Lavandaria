@@ -15,9 +15,10 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
 - [x] Create README.md as project index
 - [x] Full-project sweep: repository baseline, database analysis, E2E testing, security review
 - [x] Regenerate CLAUDE.md with Mandatory block
+- [x] **P0: Diagnose and fix E2E test suite blockage (36/37 failures)**
 
 ### Doing
-- (no active tasks)
+- (no active tasks - P0 resolved)
 
 ### Done
 - ✅ **PR #2**: [chore(docs): purge legacy Markdown](https://github.com/HSousa1987/Lavandaria/pull/2)
@@ -88,6 +89,17 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
     - Created comprehensive [docs/auth-flows.md](docs/auth-flows.md)
   - **Results**: Tests execute 5x faster, no login timeout errors
   - **Status**: Auth flows working for all 4 roles ✅
+
+- ✅ **P0 Resolution: E2E Test Suite Blockage** (2025-10-23 PM)
+  - **Problem**: 36/37 E2E tests failing with timeout on login page elements
+  - **Root Cause**: Express server not serving React build in development mode
+  - **Fix**: Removed `if (NODE_ENV === 'production')` conditional in [`server.js`](../server.js#L194)
+  - **Commit**: [`ef0f2eb`](https://github.com/HSousa1987/Lavandaria/commit/ef0f2eb)
+  - **Branch**: `fix/serve-react-in-dev`
+  - **Test Results**: 1 passing → 16 passing (+1500% improvement)
+  - **Impact**: Unblocked auth/RBAC/session/photo tests for QA validation
+  - **Verification**: Manual curl test + full E2E suite execution
+  - **Documentation**: Updated [`docs/bugs.md`](bugs.md) with complete RCA
 
 ### Next Steps
 - Merge `docs/bootstrap` branch to main

@@ -8,7 +8,70 @@ This log tracks bugs discovered, their root causes, fixes applied, and tests add
 
 ## Active Bugs
 
-### 2025-10-23 - Client Photo Viewing Completely Broken (P0)
+### 2025-10-23 - E2E Tests Completely Blocked by Server Not Serving React App (P0)
+
+**Evidence:**
+- 36/37 E2E tests failing with identical timeout error
+- Error: `TimeoutError: page.click: Timeout waiting for locator('button:has-text("Staff")')`
+- Manual verification: `curl http://localhost:3000` returns `404 Cannot GET /`
+- Server logs: Repeated `GET / 404` errors
+- React build exists at `client/build/index.html` (verified)
+- Test execution: 2025-10-23 ~22:40 UTC
+- Playwright artifacts: `test-results/` (screenshots, traces)
+
+**Root Cause:**
+- [`server.js:194`](../server.js#L194) conditional: `if (process.env.NODE_ENV === 'production')`
+- Express only serves React build in production mode
+- Environment: `NODE_ENV=development` (set in `.env` and Docker container)
+- React app never loaded by browser → login page elements never rendered → tests timeout
+
+**Chain of Evidence:**
+1. Tests fail waiting for login page elements (Staff tab button)
+2. Manual curl confirms 404 on root path
+3. React build exists but not being served
+4. server.js shows production-only conditional
+5. Environment check confirms development mode
+
+**Impact:**
+- **Complete E2E test suite blockage** (36/37 failures)
+- NOT an authentication or session bug
+- NOT a security risk
+- Deployment configuration issue preventing QA validation
+
+**Fix Applied:**
+- ✅ **Commit: `ef0f2eb`**: [fix(server): serve React app in all environments](https://github.com/HSousa1987/Lavandaria/commit/ef0f2eb)
+- Removed production-only conditional from `server.js`
+- React build now served in all environments
+- Note added: dev client may run separately on port 3001
+- **Verification**: curl returns React HTML ✅, tests reach login page ✅
+
+**Tests Results After Fix:**
+- Before: 1 passed, 36 failed
+- After: 16 passed, 21 failed
+- **15 tests unblocked** - can now authenticate and run business logic tests
+- Remaining failures are data/business logic issues (separate from this P0)
+
+**Tests Added:**
+- No new tests needed - existing suite validates the fix
+- `tests/e2e/client-photo-viewing.spec.js` now runs (11 tests)
+- `tests/e2e/rbac-and-sessions.spec.js` now runs (12 tests)
+- `tests/e2e/worker-photo-upload.spec.js` now runs (7 tests)
+- `tests/e2e/tab-navigation.spec.js` now runs (5 tests)
+- `tests/e2e/debug-tab-navigation.spec.js` now runs (2 tests)
+
+**Prevention:**
+- CI/CD pipeline should run E2E tests before merge
+- Docker health check verifies root path returns 200
+- Monitoring alert if React app not being served
+
+**Links:**
+- Commit: `ef0f2eb`
+- Test artifacts: `test-results/` directory
+- Branch: `fix/serve-react-in-dev`
+
+---
+
+### 2025-10-23 - Client Photo Viewing Completely Broken (P0 - DOWNGRADED)
 
 **Evidence:**
 - 8/8 E2E tests failing in `tests/e2e/client-photo-viewing.spec.js`
