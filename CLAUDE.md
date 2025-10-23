@@ -204,6 +204,44 @@ linear_create_issue --title "P1: Client photo viewing pagination failure" \
 linear_link_issue --issueId <id> --prUrl <url>
 ```
 
+### Vibe Check MCP
+
+**Purpose:** Autonomous agent validation and learning feedback loop
+
+**Installation:**
+```bash
+# Already installed globally and configured in .claude.json
+npm list -g @pv-bhat/vibe-check-mcp
+```
+
+**Required Usage Pattern:**
+
+As mandated at the top of this file, Claude must:
+1. Call `vibe_check` after planning and before major actions
+2. Provide the full user request and current plan
+3. Optionally record resolved issues with `vibe_learn`
+
+**Common Operations:**
+```bash
+# Validate plan before execution (MANDATORY)
+vibe_check --userRequest "Diagnose P0 auth failure" \
+  --plan "1. Evidence sweep 2. Flow inspection 3. Hypothesis testing..."
+
+# Record successful resolution pattern (OPTIONAL)
+vibe_learn --issue "Session cookies not persisting across requests" \
+  --resolution "Added SameSite=lax and domain=localhost to cookie options" \
+  --category "authentication"
+```
+
+**Verification:**
+```bash
+# After restarting Claude Code, verify connection
+/mcp  # Should list 'vibe-check' as connected
+
+# Run verification script
+./scripts/verify-vibe-check.sh
+```
+
 ---
 
 ## Docs Auto-Update Contract
