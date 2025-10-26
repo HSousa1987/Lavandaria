@@ -8,6 +8,71 @@ This log tracks bugs discovered, their root causes, fixes applied, and tests add
 
 ## Active Bugs
 
+### 2025-10-26 - Test Seed Data Missing Photo Fixtures (P1)
+
+**Evidence:**
+- 22/37 E2E tests failing (59% pass rate) despite P0 auth fixes
+- PostgreSQL-RO MCP query: `SELECT COUNT(*) FROM cleaning_job_photos WHERE cleaning_job_id IN (SELECT id FROM cleaning_jobs)` returned **0**
+- Tests expect ≥12 photos in 3 batches for pagination testing
+- Worker photo upload tests fail with "no job found" errors
+- Client photo viewing tests fail with "no photos to display" errors
+- Test execution: 2025-10-26 ~22:47 UTC
+
+**Root Cause:**
+- Original seed script ([scripts/seed-test-data.js:189-251](../scripts/seed-test-data.js#L189-L251)) creates cleaning job but **never inserts photo records**
+- Function `seedCleaningJob()` only creates job and worker assignment, no photo seeding
+- No dummy photo files created in `uploads/cleaning_photos/`
+- Tests were written assuming photo data exists, but seed script never provided it
+
+**Chain of Evidence:**
+1. E2E tests fail waiting for photo elements
+2. PostgreSQL query confirms 0 photos in database
+3. `uploads/cleaning_photos/` directory empty (no test files)
+4. Seed script source code has no photo INSERT logic
+5. Schema has `cleaning_job_photos` table with correct structure, just no data
+
+**Impact:**
+- **22 E2E tests blocked** (all photo viewing, upload, pagination tests)
+- Tests cannot validate photo verification feature (core business functionality)
+- No way to test RBAC for photo access (security risk)
+- Test coverage artificially low due to missing fixtures
+
+**Fix Applied:**
+- ✅ **Commit: `055d4f8`**: [qa: add deterministic seed data and route availability checklist](https://github.com/HSousa1987/Lavandaria/commit/055d4f8)
+- Created new script: [scripts/seed-test-data-deterministic.js](../scripts/seed-test-data-deterministic.js)
+- **Photo fixtures**: Creates 15 test photos in 3 batches (5 photos per batch)
+- **Dummy files**: Generates minimal valid JPEG files (1x1 pixel, ~130 bytes)
+- **Deterministic IDs**: Job 100 gets exactly 15 photos, photo types rotate (before/after/detail)
+- **Room areas**: Photos assigned to kitchen, bathroom, bedroom, living_room, hallway (rotates)
+- **Verification**: PostgreSQL query confirms 15 photos inserted with correct foreign keys
+
+**Tests Results After Fix:**
+- Before: 0 photos, 22 tests fail on photo preconditions
+- After: 15 photos, expect 10-15 more tests to pass (pending full test run)
+
+**Schema Bugs Found During Fix:**
+- Column name mismatch: seed script used `password_hash`, actual column is `password`
+- Column name mismatch: seed script used `notes`, actual column is `internal_notes`
+- Column name mismatch: seed script used `order_id`, actual column is `laundry_order_id`
+- Missing required column: `order_number` (unique) not provided in seed script
+- These were caught during deterministic seed development via PostgreSQL-RO MCP schema inspection
+
+**Prevention:**
+- New deterministic seed script has built-in verification (counts records after insert)
+- CI/CD should run `SELECT COUNT(*) FROM cleaning_job_photos` and assert > 0
+- Add E2E test: "seed data should include at least 12 photos" (smoke test for fixtures)
+- Document required seed data in test README
+
+**Links:**
+- Commit: [`055d4f8`](https://github.com/HSousa1987/Lavandaria/commit/055d4f8)
+- Branch: `qa/deterministic-seed-and-routes`
+- New seed script: [scripts/seed-test-data-deterministic.js](../scripts/seed-test-data-deterministic.js)
+- Verification query result: Job 100 has 15 photos ([PostgreSQL-RO output](../preflight-results/))
+
+---
+
+## Active Bugs
+
 ### 2025-10-23 - E2E Tests Completely Blocked by Server Not Serving React App (P0)
 
 **Evidence:**

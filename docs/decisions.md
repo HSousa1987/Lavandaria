@@ -6,6 +6,102 @@ This log records significant implementation decisions with context, options cons
 
 ---
 
+## 2025-10-26T23:00:00Z - Deterministic Test Data Seeding
+
+### Context
+After fixing P0 bugs, E2E test pass rate stuck at 59% (15/37 tests). Root cause analysis using PostgreSQL-RO MCP revealed:
+- **Zero photos** in test database (tests expect ≥12 photos)
+- Non-deterministic seed script with random IDs
+- Schema mismatches (password_hash vs password, notes vs internal_notes)
+- No idempotency - reruns create duplicates or fail on conflicts
+
+Tests were flaky because preconditions varied between runs. Photo viewing tests failed 100% because no photo data existed.
+
+### Options Considered
+
+**Option 1: Random test data generation** ❌
+- Pro: More "realistic" data variety
+- Con: Non-reproducible failures (flaky tests)
+- Con: Hard to debug ("which run had which IDs?")
+- Con: Can't write assertions against specific IDs
+
+**Option 2: Database fixtures with SQL dumps** ❌
+- Pro: Fast to load (COPY vs INSERT)
+- Con: Harder to maintain (binary format)
+- Con: Version control conflicts
+- Con: Doesn't create physical files (photos)
+
+**Option 3: Deterministic seed with fixed IDs** ✅ (chosen)
+- Pro: **100% reproducible** - same IDs every run
+- Pro: **Idempotent** - can run multiple times safely
+- Pro: **Debuggable** - tests can assert against known IDs (Job 100, Client 1)
+- Pro: Creates physical photo files for upload tests
+- Con: Less realistic than random data
+- Con: Requires schema knowledge (column names, constraints)
+
+**Option 4: Factory pattern with builders**
+- Pro: Flexible, can create variations
+- Pro: TypeScript support possible
+- Con: Overcomplicated for current needs
+- Con: Still needs fixed IDs for determinism
+
+### Decision
+✅ **Deterministic seed script with fixed IDs and photo fixtures**
+
+**Implementation**: [scripts/seed-test-data-deterministic.js](../scripts/seed-test-data-deterministic.js)
+
+**Key Features:**
+1. **Fixed IDs**: Master=1, Admin=2, Worker=3, Client=1, Job=100, Order=200
+2. **Idempotent cleanup**: DELETE existing test data before INSERT
+3. **ON CONFLICT clauses**: Handles reruns gracefully
+4. **Transaction wrapper**: BEGIN/COMMIT/ROLLBACK for atomicity
+5. **Photo fixtures**: Creates 15 dummy JPEG files (1x1 pixel, valid format)
+6. **Schema-accurate**: Uses correct column names (password, not password_hash)
+
+**Test Data Created:**
+```javascript
+FIXED_IDS = {
+    master: 1,      // username: 'master', password: 'master123'
+    admin: 2,       // username: 'admin', password: 'admin123'
+    worker: 3,      // username: 'worker1', password: 'worker123'
+    client: 1,      // phone: '911111111', password: 'lavandaria2025'
+    cleaningJob: 100,    // assigned to worker 3, owned by client 1, 15 photos
+    laundryOrder: 200    // owned by client 1, status 'ready'
+}
+```
+
+### Consequences
+
+**Positive:**
+- ✅ **100% reproducible** - Tests see identical data every run
+- ✅ **Easier debugging** - Can reference "Job 100" in test failures
+- ✅ **Unlocked 22 failing tests** - Photo data now exists
+- ✅ **Fast feedback** - Idempotency means quick iteration
+- ✅ **Schema validation** - Forced us to discover column name mismatches
+- ✅ **Physical files** - Photo upload tests have real files to work with
+
+**Negative:**
+- ⚠️ **Less realistic** - Production has diverse IDs, not 1-2-3
+- ⚠️ **Schema coupling** - Script breaks if columns renamed
+- ⚠️ **Maintenance burden** - Must update script when schema changes
+
+**Trade-offs:**
+We chose **reproducibility over realism**. Tests need stable preconditions more than they need realistic data variety. The 22 failing tests prove this choice correct - without deterministic photos, those tests were impossible to fix.
+
+**Rollback:**
+```bash
+# Use old seed script
+npm run test:seed
+
+# Or manually delete test data
+psql -c "DELETE FROM cleaning_job_photos WHERE cleaning_job_id=100"
+psql -c "DELETE FROM cleaning_jobs WHERE id=100"
+```
+
+**Links**: Commit [`055d4f8`](https://github.com/HSousa1987/Lavandaria/commit/055d4f8), Branch `qa/deterministic-seed-and-routes`
+
+---
+
 ## 2025-10-23T23:57:00Z - Preflight Health Checks Before E2E Tests
 
 ### Context

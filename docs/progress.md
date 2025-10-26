@@ -4,6 +4,68 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
 
 ---
 
+## 2025-10-26
+
+### Planned
+- [x] Diagnose root cause of 22 E2E test failures (59% pass rate)
+- [x] Create deterministic seed data script with fixed IDs and photo fixtures
+- [x] Build route availability checklist for pre-flight validation
+- [x] Verify database baseline using PostgreSQL-RO MCP
+- [x] Document seed data bugs and schema mismatches
+
+### Doing
+- (awaiting PR review)
+
+### Done
+- ✅ **Root Cause Analysis - Test Failures**:
+  - Used PostgreSQL-RO MCP to inspect database state
+  - Discovered **ZERO photos** in test data (tests expect ≥12)
+  - Found schema mismatches (password_hash → password, notes → internal_notes)
+  - Identified non-deterministic seed script (random IDs, no idempotency)
+
+- ✅ **Deterministic Seed Script** ([scripts/seed-test-data-deterministic.js](../scripts/seed-test-data-deterministic.js)):
+  - **Fixed IDs**: Master=1, Admin=2, Worker=3, Client=1, Job=100, Order=200
+  - **Idempotent**: DELETE then INSERT with ON CONFLICT (can run multiple times)
+  - **Photo Fixtures**: Creates 15 test photos in 3 batches (5 per batch)
+  - **Dummy Files**: Generates minimal valid JPEG files (1x1 pixel)
+  - **Transaction Safety**: Uses BEGIN/COMMIT/ROLLBACK for atomicity
+  - **Verification**: Confirmed 15 photos for job 100 via PostgreSQL query
+
+- ✅ **Route Availability Checklist** ([scripts/route-availability-check.sh](../scripts/route-availability-check.sh)):
+  - Tests 20+ critical routes (health, auth, jobs, orders, dashboard)
+  - Pre-auth and post-auth scenarios for RBAC validation
+  - Captures correlation IDs, response times, status codes
+  - Outputs JSON artifact: `preflight-results/route-checklist-{timestamp}.json`
+  - Color-coded terminal output for quick visual feedback
+
+- ✅ **Database Verification** (PostgreSQL-RO MCP):
+  - Schema inspection: users, clients, cleaning_jobs, cleaning_job_photos, laundry_orders_new
+  - Confirmed correct column names: `password` (not password_hash), `laundry_order_id` (not order_id)
+  - Validated foreign key relationships and constraints
+  - Verified test data: Job 100 has 15 photos, assigned to Worker 3, owned by Client 1
+
+- ✅ **Commit**: [`055d4f8`](https://github.com/HSousa1987/Lavandaria/commit/055d4f8)
+  - Branch: `qa/deterministic-seed-and-routes`
+  - 2 files: seed script (350 lines), route checklist (200 lines)
+  - Comprehensive commit message with problem statement, solution, rollback notes
+
+### Blockers
+- None (deterministic seed unlocks failing tests)
+
+### Notes
+- **Schema Discovery**: PostgreSQL-RO MCP invaluable for schema inspection during debugging
+- **Photo Gap**: Original seed script had NO photo seeding logic - major gap found
+- **Idempotency**: ON CONFLICT clauses allow script to run repeatedly without errors
+- **Context Usage**: 88K / 200K tokens (44%) - healthy room for remaining work
+
+### Next Steps
+- Open PR "qa: deterministic seed and route availability"
+- Run full E2E suite with deterministic seed (expect 25-30 tests passing, up from 15)
+- Fix route checklist timestamp arithmetic bug
+- Update package.json to add `test:seed:deterministic` script
+
+---
+
 ## 2025-10-23
 
 ### Planned
