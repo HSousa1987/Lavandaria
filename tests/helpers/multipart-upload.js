@@ -23,12 +23,17 @@ function buildPhotoUploadForm(filePaths) {
         throw new Error('buildPhotoUploadForm requires a non-empty array of file paths');
     }
 
-    // Read all files as binary buffers
-    const files = filePaths.map(filePath => {
+    // Validate all files exist
+    filePaths.forEach(filePath => {
         if (!fs.existsSync(filePath)) {
             throw new Error(`File not found: ${filePath}`);
         }
+    });
 
+    // For Playwright, when uploading multiple files to the same field name,
+    // we need to provide file objects with name, mimeType, and buffer
+    // The key insight: each file must be a separate object in the array
+    const files = filePaths.map(filePath => {
         const buffer = fs.readFileSync(filePath);
         const filename = path.basename(filePath);
         const ext = path.extname(filename).toLowerCase();
@@ -38,7 +43,8 @@ function buildPhotoUploadForm(filePaths) {
             '.jpg': 'image/jpeg',
             '.jpeg': 'image/jpeg',
             '.png': 'image/png',
-            '.gif': 'image/gif'
+            '.gif': 'image/gif',
+            '.txt': 'text/plain'
         };
 
         const mimeType = mimeTypes[ext] || 'application/octet-stream';
@@ -50,8 +56,7 @@ function buildPhotoUploadForm(filePaths) {
         };
     });
 
-    // Return multipart structure for Playwright
-    // Multer's upload.array('photos', 10) expects multiple files under the 'photos' field
+    //  Return multipart with the photos field as an array
     return {
         multipart: {
             photos: files
