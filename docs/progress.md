@@ -58,11 +58,26 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
 - **Idempotency**: ON CONFLICT clauses allow script to run repeatedly without errors
 - **Context Usage**: 88K / 200K tokens (44%) - healthy room for remaining work
 
+### Post-Seed E2E Triage (Later on 2025-10-26)
+- ✅ Re-ran full E2E suite with deterministic seed
+- ❌ **UNEXPECTED**: Still 15/37 passing (59%) - **NO IMPROVEMENT**
+- ✅ Created comprehensive triage report with failure analysis
+
+**Critical Finding**: Photo fixtures exist but tests still fail due to:
+1. 🔴 **Test code bugs** (Playwright multipart API misuse) - 7 tests
+2. 🔴 **API routes missing/misconfigured** - 8 tests
+3. 🟠 **RBAC/session routes failing** - 7 tests
+
+**Artifacts**:
+- [Triage Report](../preflight-results/e2e-triage-report-20251026.md) - Full analysis
+- [Seed Output](../preflight-results/) - Verified 15 photos seeded
+- HTML Report: `npm run test:e2e:report`
+
 ### Next Steps
-- Open PR "qa: deterministic seed and route availability"
-- Run full E2E suite with deterministic seed (expect 25-30 tests passing, up from 15)
-- Fix route checklist timestamp arithmetic bug
-- Update package.json to add `test:seed:deterministic` script
+- 🔴 **PR #7**: Fix photo upload test code (Playwright API bug)
+- 🔴 **PR #8**: Verify/fix photo API route registration
+- 🟠 **PR #9**: Fix RBAC/session/health route registration
+- Target: 30/37 passing (81%) after all 3 PRs
 
 ---
 
