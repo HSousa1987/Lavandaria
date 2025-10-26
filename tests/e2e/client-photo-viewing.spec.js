@@ -39,6 +39,7 @@ async function loginAsClient(page) {
 
 // Helper to get client's job ID
 async function getClientJobId(page) {
+    // Use page.request to share session cookies from page context
     const response = await page.request.get('/api/cleaning-jobs?limit=1');
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
@@ -51,10 +52,10 @@ test.describe('Client Photo Viewing - Complete Set Access', () => {
         await loginAsClient(page);
     });
 
-    test('client can view all photos for their own job', async ({ page, request }) => {
+    test('client can view all photos for their own job', async ({ page }) => {
         const jobId = await getClientJobId(page);
 
-        const response = await request.get(`/api/cleaning-jobs/${jobId}`);
+        const response = await page.request.get(`/api/cleaning-jobs/${jobId}`);
         expect(response.ok()).toBeTruthy();
 
         const result = await response.json();
@@ -75,11 +76,11 @@ test.describe('Client Photo Viewing - Complete Set Access', () => {
         expect(result.photosPagination).toHaveProperty('hasMore');
     });
 
-    test('client can paginate through large photo sets', async ({ page, request }) => {
+    test('client can paginate through large photo sets', async ({ page }) => {
         const jobId = await getClientJobId(page);
 
         // First page (default limit 100)
-        const page1 = await request.get(`/api/cleaning-jobs/${jobId}?photoLimit=10&photoOffset=0`);
+        const page1 = await page.request.get(`/api/cleaning-jobs/${jobId}?photoLimit=10&photoOffset=0`);
         expect(page1.ok()).toBeTruthy();
         const result1 = await page1.json();
 
@@ -89,7 +90,7 @@ test.describe('Client Photo Viewing - Complete Set Access', () => {
 
         // If there are more photos, fetch second page
         if (result1.photosPagination.hasMore) {
-            const page2 = await request.get(`/api/cleaning-jobs/${jobId}?photoLimit=10&photoOffset=10`);
+            const page2 = await page.request.get(`/api/cleaning-jobs/${jobId}?photoLimit=10&photoOffset=10`);
             expect(page2.ok()).toBeTruthy();
             const result2 = await page2.json();
 
@@ -98,25 +99,25 @@ test.describe('Client Photo Viewing - Complete Set Access', () => {
         }
     });
 
-    test('client viewing photos marks them as viewed', async ({ page, request }) => {
+    test('client viewing photos marks them as viewed', async ({ page }) => {
         const jobId = await getClientJobId(page);
 
         // First view - should update viewed status
-        const response1 = await request.get(`/api/cleaning-jobs/${jobId}`);
+        const response1 = await page.request.get(`/api/cleaning-jobs/${jobId}`);
         expect(response1.ok()).toBeTruthy();
 
         // Second view - verify job marked as viewed
-        const response2 = await request.get(`/api/cleaning-jobs/${jobId}`);
+        const response2 = await page.request.get(`/api/cleaning-jobs/${jobId}`);
         expect(response2.ok()).toBeTruthy();
         const result = await response2.json();
 
         expect(result.job.client_viewed_photos).toBe(true);
     });
 
-    test('client receives complete photo count even with many batches', async ({ page, request }) => {
+    test('client receives complete photo count even with many batches', async ({ page }) => {
         const jobId = await getClientJobId(page);
 
-        const response = await request.get(`/api/cleaning-jobs/${jobId}`);
+        const response = await page.request.get(`/api/cleaning-jobs/${jobId}`);
         expect(response.ok()).toBeTruthy();
 
         const result = await response.json();
@@ -137,11 +138,11 @@ test.describe('Client Photo Viewing - RBAC Enforcement', () => {
         await loginAsClient(page);
     });
 
-    test('client cannot access another client\'s job photos', async ({ page, request }) => {
+    test('client cannot access another client\'s job photos', async ({ page }) => {
         // Attempt to access a job ID that doesn't belong to this client
         const unauthorizedJobId = 99999;
 
-        const response = await request.get(`/api/cleaning-jobs/${unauthorizedJobId}`);
+        const response = await page.request.get(`/api/cleaning-jobs/${unauthorizedJobId}`);
 
         expect(response.status()).toBe(404);
         const result = await response.json();
@@ -202,10 +203,10 @@ test.describe('Client Photo Viewing - Response Validation', () => {
         await loginAsClient(page);
     });
 
-    test('all responses include correlation IDs', async ({ page, request }) => {
+    test('all responses include correlation IDs', async ({ page }) => {
         const jobId = await getClientJobId(page);
 
-        const response = await request.get(`/api/cleaning-jobs/${jobId}`);
+        const response = await page.request.get(`/api/cleaning-jobs/${jobId}`);
         const result = await response.json();
 
         // Verify correlation ID in response body
@@ -220,10 +221,10 @@ test.describe('Client Photo Viewing - Response Validation', () => {
         }
     });
 
-    test('error responses include correlation IDs', async ({ page, request }) => {
+    test('error responses include correlation IDs', async ({ page }) => {
         const invalidJobId = 99999;
 
-        const response = await request.get(`/api/cleaning-jobs/${invalidJobId}`);
+        const response = await page.request.get(`/api/cleaning-jobs/${invalidJobId}`);
         expect(response.ok()).toBeFalsy();
 
         const result = await response.json();
