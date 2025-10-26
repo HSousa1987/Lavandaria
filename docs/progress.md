@@ -79,6 +79,48 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
 - 🟠 **PR #9**: Fix RBAC/session/health route registration
 - Target: 30/37 passing (81%) after all 3 PRs
 
+### Later on 2025-10-26: Test Fix Attempt & Blocker Discovery
+
+**Planned**:
+- Fix worker media upload tests (multipart correctness + envelope assertions)
+- Restore photo endpoints (registration, RBAC, pagination)
+- Repair session/health/finance surfaces
+- Full suite triage with artifact table
+- Regenerate CLAUDE.md
+
+**Done**:
+- ✅ **Created centralized upload helper**: [tests/helpers/multipart-upload.js](../tests/helpers/multipart-upload.js)
+- ✅ **Updated validation middleware**: Added `success: false` to errorResponse for consistency
+- ✅ **Updated all worker upload tests**: Refactored to use helper with envelope/correlation assertions
+- ✅ **Documented Playwright blocker**: Added to [docs/bugs.md](bugs.md) as P2 issue
+- ✅ **Commit**: [`674c222`](https://github.com/HSousa1987/Lavandaria/commit/674c222) - Test improvements
+- ✅ **Commit**: [`3e440bb`](https://github.com/HSousa1987/Lavandaria/commit/3e440bb) - WIP with blocker notes
+- ✅ **Commit**: [`c63bcef`](https://github.com/HSousa1987/Lavandaria/commit/c63bcef) - Bug documentation
+
+**Blocker Discovered**:
+- ❌ **Playwright Request API Limitation**: Cannot send multiple files to same field in multipart uploads
+- Error: `stream.on is not a function` on all worker upload tests
+- Root cause: Playwright's `multipart` option doesn't support file arrays for single field
+- Multer endpoint needs `upload.array('photos', 10)` which expects multiple files under 'photos' field
+- Attempted 3+ different formats - all fail with same error
+
+**Workaround Options**:
+1. **UI-based testing** (recommended): Use `page.setInputFiles()` with file input element
+2. Individual requests (changes test semantics)
+3. Raw FormData construction (complex)
+4. Different HTTP client like Axios (adds dependency)
+
+**Current Status**:
+- **22 failed, 15 passed** (40.5% pass rate) - unchanged from baseline
+- 7 worker upload tests blocked by Playwright API issue
+- 8 client viewing tests likely blocked by missing/misconfigured routes
+- 7 RBAC/session tests need route registration fixes
+
+**Artifacts**:
+- Branch: `qa/fix-upload-tests`
+- Test traces: [test-results/](../test-results/)
+- Preflight: [preflight-results/preflight_20251026_233947.json](../preflight-results/preflight_20251026_233947.json)
+
 ---
 
 ## 2025-10-23
