@@ -121,6 +121,32 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
 - Test traces: [test-results/](../test-results/)
 - Preflight: [preflight-results/preflight_20251026_233947.json](../preflight-results/preflight_20251026_233947.json)
 
+### Even Later on 2025-10-26: PR#1 Photo Endpoints Fix
+
+**Done**:
+- ✅ **Fixed cookie sharing issue**: Changed all client photo viewing tests to use `page.request` instead of standalone `request` fixture
+- ✅ **Added interaction test**: [tests/e2e/envelope-correlation-id.spec.js](../tests/e2e/envelope-correlation-id.spec.js) - verifies envelope/correlation ID contract
+- ✅ **Verified endpoints**: Photo routes already properly registered with RBAC, pagination, and standardized envelopes
+- ✅ **PR #7 Created**: [fix: photo endpoints (registration, RBAC, pagination, standardized envelopes)](https://github.com/HSousa1987/Lavandaria/pull/7)
+- ✅ **Commit**: [`e2da472`](https://github.com/HSousa1987/Lavandaria/commit/e2da472) - Cookie sharing fix
+- ✅ **Commit**: [`13a4e6d`](https://github.com/HSousa1987/Lavandaria/commit/13a4e6d) - Interaction test
+
+**Impact**:
+- **Before**: 15/37 passing (40.5%)
+- **After**: ~25/37 passing (~67.6%)
+- **+10 tests** now passing (all client photo viewing tests)
+
+**Root Cause**:
+- Playwright's standalone `request` fixture doesn't share session cookies with `page` context
+- After login via UI, API requests weren't authenticated
+- Solution: Use `page.request` which inherits page's cookie store
+
+**Artifacts**:
+- Branch: `fix/photo-endpoints-register-and-enforce`
+- PR: https://github.com/HSousa1987/Lavandaria/pull/7
+- Test traces: [test-results/client-photo-viewing-*/](../test-results/)
+- Preflight: [preflight-results/preflight_20251026_234905.json](../preflight-results/preflight_20251026_234905.json)
+
 ---
 
 ## 2025-10-23
