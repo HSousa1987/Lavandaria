@@ -21,5 +21,5 @@
         - paragraph [ref=e23]: "1"
       - generic [ref=e24]:
         - heading "Today's Jobs" [level=3] [ref=e25]
-        - paragraph [ref=e26]: "0"
+        - paragraph [ref=e26]: "1"
 ```

@@ -189,14 +189,17 @@ test.describe('Session Behavior', () => {
         // All users navigate to /dashboard after login
         await page.waitForURL('/dashboard', { timeout: 10000 });
 
-        // Check session endpoint
+        // Check session endpoint (with standardized envelope)
         const response = await request.get('/api/auth/check');
         expect(response.ok()).toBeTruthy();
 
         const result = await response.json();
-        expect(result).toHaveProperty('user');
-        expect(result.user).toHaveProperty('username', CREDENTIALS.admin.username);
-        expect(result.user).toHaveProperty('userType', 'admin');
+        expect(result).toHaveProperty('success', true);
+        expect(result).toHaveProperty('data');
+        expect(result.data).toHaveProperty('authenticated', true);
+        expect(result.data).toHaveProperty('userType', 'admin');
+        expect(result._meta).toBeDefined();
+        expect(result._meta.correlationId).toBeDefined();
     });
 
     test('logout clears session and denies access', async ({ page, request }) => {
@@ -214,9 +217,14 @@ test.describe('Session Behavior', () => {
         const beforeLogout = await request.get('/api/cleaning-jobs');
         expect(beforeLogout.ok()).toBeTruthy();
 
-        // Logout
+        // Logout (with standardized envelope)
         const logoutResponse = await request.post('/api/auth/logout');
         expect(logoutResponse.ok()).toBeTruthy();
+
+        const logoutResult = await logoutResponse.json();
+        expect(logoutResult).toHaveProperty('success', true);
+        expect(logoutResult._meta).toBeDefined();
+        expect(logoutResult._meta.correlationId).toBeDefined();
 
         // Verify session cleared
         const afterLogout = await request.get('/api/cleaning-jobs');
@@ -284,8 +292,14 @@ test.describe('Health and Readiness Endpoints', () => {
         expect(response.ok()).toBeTruthy();
         const result = await response.json();
 
-        expect(result).toHaveProperty('status', 'healthy');
-        expect(result).toHaveProperty('timestamp');
+        // Standardized envelope format
+        expect(result).toHaveProperty('success', true);
+        expect(result).toHaveProperty('data');
+        expect(result.data).toHaveProperty('status', 'ok');
+        expect(result.data).toHaveProperty('service', 'lavandaria-api');
+        expect(result._meta).toBeDefined();
+        expect(result._meta.correlationId).toBeDefined();
+        expect(result._meta.timestamp).toBeDefined();
     });
 
     test('readiness endpoint returns database status', async ({ request }) => {
@@ -294,14 +308,17 @@ test.describe('Health and Readiness Endpoints', () => {
         expect(response.ok()).toBeTruthy();
         const result = await response.json();
 
-        expect(result).toHaveProperty('status');
-        expect(result).toHaveProperty('database');
-        expect(result.database).toHaveProperty('connected');
-
-        if (result.database.connected) {
-            expect(result.database).toHaveProperty('latency');
-            expect(typeof result.database.latency).toBe('number');
-        }
+        // Standardized envelope format
+        expect(result).toHaveProperty('success', true);
+        expect(result).toHaveProperty('data');
+        expect(result.data).toHaveProperty('status', 'ready');
+        expect(result.data).toHaveProperty('checks');
+        expect(result.data.checks).toHaveProperty('database');
+        expect(result.data.checks.database).toHaveProperty('status', 'ok');
+        expect(result.data.checks.database).toHaveProperty('latency_ms');
+        expect(typeof result.data.checks.database.latency_ms).toBe('number');
+        expect(result._meta).toBeDefined();
+        expect(result._meta.correlationId).toBeDefined();
     });
 
     test('health and readiness are public (no auth required)', async ({ browser }) => {

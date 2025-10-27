@@ -3,6 +3,21 @@ const router = express.Router();
 const { pool } = require('../config/database');
 const { requireFinanceAccess } = require('../middleware/permissions');
 
+// Root dashboard endpoint (redirects to stats) - Finance access required
+router.get('/', requireFinanceAccess, (req, res) => {
+    res.json({
+        success: true,
+        data: {
+            message: 'Dashboard API',
+            endpoints: ['/api/dashboard/stats']
+        },
+        _meta: {
+            correlationId: req.correlationId,
+            timestamp: new Date().toISOString()
+        }
+    });
+});
+
 // Get dashboard statistics (Master and Admin only - includes finance)
 router.get('/stats', requireFinanceAccess, async (req, res) => {
     try {
