@@ -25,8 +25,9 @@ export const AuthProvider = ({ children }) => {
   const checkAuth = async () => {
     try {
       const response = await axios.get('/api/auth/check');
-      if (response.data.authenticated) {
-        setUser(response.data);
+      // Consume standardized envelope format: { success, data: {...}, _meta }
+      if (response.data.success && response.data.data?.authenticated) {
+        setUser(response.data.data);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -44,10 +45,15 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post('/api/auth/logout');
-      setUser(null);
+      const response = await axios.post('/api/auth/logout');
+      // Verify standardized envelope response
+      if (response.data.success) {
+        setUser(null);
+      }
     } catch (error) {
       console.error('Logout failed:', error);
+      // Still clear user state on error to avoid stuck sessions
+      setUser(null);
     }
   };
 
