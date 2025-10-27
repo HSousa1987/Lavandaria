@@ -213,9 +213,10 @@ router.get('/check', (req, res) => {
 // Session endpoint (alias for /check with standardized name)
 router.get('/session', (req, res) => {
     if (!req.session.userType) {
-        return res.json({
+        return res.status(401).json({
             success: false,
             error: 'Not authenticated',
+            code: 'UNAUTHENTICATED',
             _meta: {
                 correlationId: req.correlationId,
                 timestamp: new Date().toISOString()
@@ -227,8 +228,8 @@ router.get('/session', (req, res) => {
         success: true,
         data: {
             authenticated: true,
-            userType: req.session.userType,
-            userName: req.session.userName,
+            role: req.session.userType,
+            principal: req.session.userName,
             userId: req.session.userId || req.session.clientId,
             mustChangePassword: req.session.mustChangePassword
         },
@@ -255,10 +256,12 @@ router.post('/logout', (req, res) => {
         }
 
         console.log(`✅ [AUTH] Logout successful [${req.correlationId}]`);
+        // Clear cookie explicitly
+        res.clearCookie('connect.sid');
         res.json({
             success: true,
             data: {
-                message: 'Logged out successfully'
+                loggedOut: true
             },
             _meta: {
                 correlationId: req.correlationId,

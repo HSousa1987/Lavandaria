@@ -2,45 +2,31 @@
 
 ```yaml
 - generic [ref=e3]:
-  - banner [ref=e8]:
-    - generic [ref=e10]:
-      - generic [ref=e11]:
-        - img [ref=e13]
-        - generic [ref=e15]:
-          - heading "Lavandaria" [level=1] [ref=e16]
-          - paragraph [ref=e17]: Premium Cleaning Services
-      - button "Back" [ref=e18] [cursor=pointer]
-  - generic [ref=e20]:
-    - heading "Welcome Back" [level=2] [ref=e21]
-    - paragraph [ref=e22]: Login to access your account
-    - generic [ref=e23]:
-      - button "Client" [ref=e24] [cursor=pointer]
-      - button "Staff" [ref=e25] [cursor=pointer]
-    - generic [ref=e26]:
-      - generic [ref=e27]:
-        - generic [ref=e28]: Phone Number
-        - generic [ref=e29]:
-          - generic:
-            - img
-          - textbox "912345678" [ref=e30]
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - heading "Lavandaria Dashboard" [level=1] [ref=e8]
+        - paragraph [ref=e9]: Welcome, Admin User (admin)
+      - button "Logout" [ref=e10] [cursor=pointer]
+  - main [ref=e11]:
+    - tablist [ref=e14]:
+      - tab "Overview" [selected] [ref=e15] [cursor=pointer]
+      - tab "Workers" [ref=e16] [cursor=pointer]
+      - tab "Clients" [ref=e17] [cursor=pointer]
+      - tab "All Jobs" [ref=e18] [cursor=pointer]
+      - tab "Cleaning Jobs" [ref=e19] [cursor=pointer]
+      - tab "Laundry Orders" [ref=e20] [cursor=pointer]
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - heading "Total Clients" [level=3] [ref=e23]
+        - paragraph [ref=e24]: "1"
+      - generic [ref=e25]:
+        - heading "Total Orders" [level=3] [ref=e26]
+        - paragraph [ref=e27]: "3"
+      - generic [ref=e28]:
+        - heading "Revenue" [level=3] [ref=e29]
+        - paragraph [ref=e30]: €0.00
       - generic [ref=e31]:
-        - generic [ref=e32]: Password
-        - generic [ref=e33]:
-          - generic:
-            - img
-          - textbox "Enter your password" [ref=e34]
-      - button "Login" [ref=e35] [cursor=pointer]
-    - paragraph [ref=e37]:
-      - text: "First time? Default password:"
-      - code [ref=e38]: lavandaria2025
-  - contentinfo [ref=e39]:
-    - generic [ref=e41]:
-      - generic [ref=e42]: © 2025 Lavandaria. All rights reserved.
-      - generic [ref=e43]:
-        - link "Privacy Policy" [ref=e44] [cursor=pointer]:
-          - /url: "#"
-        - link "Terms of Service" [ref=e45] [cursor=pointer]:
-          - /url: "#"
-        - link "Contact" [ref=e46] [cursor=pointer]:
-          - /url: "#"
+        - heading "Pending" [level=3] [ref=e32]
+        - paragraph [ref=e33]: "0"
 ```

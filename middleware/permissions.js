@@ -37,10 +37,24 @@ const requireMaster = (req, res, next) => {
 
 // Master or Admin
 const requireMasterOrAdmin = (req, res, next) => {
+    // Check authentication first
+    if (!req.session.userType) {
+        return res.status(401).json({
+            success: false,
+            error: 'Authentication required',
+            code: 'UNAUTHENTICATED',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+
     if (req.session.userType !== 'master' && req.session.userType !== 'admin') {
         return res.status(403).json({
             success: false,
             error: 'Admin access required',
+            code: 'ADMIN_ACCESS_REQUIRED',
             _meta: {
                 correlationId: req.correlationId,
                 timestamp: new Date().toISOString()
@@ -52,11 +66,25 @@ const requireMasterOrAdmin = (req, res, next) => {
 
 // Master, Admin, or Worker
 const requireStaff = (req, res, next) => {
+    // Check authentication first
+    if (!req.session.userType) {
+        return res.status(401).json({
+            success: false,
+            error: 'Authentication required',
+            code: 'UNAUTHENTICATED',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+
     const staffRoles = ['master', 'admin', 'worker'];
     if (!staffRoles.includes(req.session.userType)) {
         return res.status(403).json({
             success: false,
             error: 'Staff access required',
+            code: 'STAFF_ACCESS_REQUIRED',
             _meta: {
                 correlationId: req.correlationId,
                 timestamp: new Date().toISOString()
@@ -83,11 +111,26 @@ const requireClient = (req, res, next) => {
 
 // Finance access (Master or Admin only, NOT workers)
 const requireFinanceAccess = (req, res, next) => {
+    // Check authentication first
+    if (!req.session.userType) {
+        return res.status(401).json({
+            success: false,
+            error: 'Authentication required',
+            code: 'UNAUTHENTICATED',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+
+    // Then check finance permission
     if (req.session.userType !== 'master' && req.session.userType !== 'admin') {
         console.log(`🚫 [RBAC] Finance access denied for role: ${req.session.userType} [${req.correlationId}]`);
         return res.status(403).json({
             success: false,
             error: 'Finance access denied',
+            code: 'FINANCE_ACCESS_DENIED',
             _meta: {
                 correlationId: req.correlationId,
                 timestamp: new Date().toISOString()
