@@ -1,21 +1,22 @@
-<testsuites id="" name="" tests="12" failures="7" skipped="0" errors="0" time="40.299681">
-<testsuite name="rbac-and-sessions.spec.js" timestamp="2025-10-27T20:55:29.115Z" hostname="chromium" tests="12" failures="7" skipped="0" time="31.901" errors="0">
-<testcase name="RBAC - Finance Access Restrictions › worker cannot access finance routes" classname="rbac-and-sessions.spec.js" time="3.473">
+<testsuites id="" name="" tests="12" failures="9" skipped="0" errors="0" time="120.370065">
+<testsuite name="rbac-and-sessions.spec.js" timestamp="2025-10-27T21:01:22.928Z" hostname="chromium" tests="12" failures="9" skipped="0" time="108.752" errors="0">
+<testcase name="RBAC - Finance Access Restrictions › worker cannot access finance routes" classname="rbac-and-sessions.spec.js" time="13.849">
 <failure message="rbac-and-sessions.spec.js:36:5 worker cannot access finance routes" type="FAILURE">
 <![CDATA[  [chromium] › rbac-and-sessions.spec.js:36:5 › RBAC - Finance Access Restrictions › worker cannot access finance routes 
 
-    Error: expect(received).toBeDefined()
+    TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation to "/dashboard" until "load"
+    ============================================================
 
-    Received: undefined
-
-      54 |             expect(result).toHaveProperty('error');
-      55 |             expect(result.error.toLowerCase()).toContain('finance');
-    > 56 |             expect(result._meta).toBeDefined();
-         |                                  ^
-      57 |             expect(result._meta.correlationId).toBeDefined();
-      58 |
-      59 |             console.log(`✅ Worker blocked from ${route} with correlation ID: ${result._meta.correlationId}`);
-        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:56:34
+      43 |         await page.click('button[type="submit"]');
+      44 |         // All users navigate to /dashboard after login
+    > 45 |         await page.waitForURL('/dashboard', { timeout: 10000 });
+         |                    ^
+      46 |
+      47 |         // Test each finance route
+      48 |         for (const route of FINANCE_ROUTES) {
+        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:45:20
 
     attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
     ../../test-results/rbac-and-sessions-RBAC---F-7849d-annot-access-finance-routes-chromium/test-failed-1.png
@@ -48,33 +49,72 @@
 ]]>
 </system-out>
 </testcase>
-<testcase name="RBAC - Finance Access Restrictions › admin can access finance routes" classname="rbac-and-sessions.spec.js" time="3.503">
+<testcase name="RBAC - Finance Access Restrictions › admin can access finance routes" classname="rbac-and-sessions.spec.js" time="13.45">
+<failure message="rbac-and-sessions.spec.js:63:5 admin can access finance routes" type="FAILURE">
+<![CDATA[  [chromium] › rbac-and-sessions.spec.js:63:5 › RBAC - Finance Access Restrictions › admin can access finance routes 
+
+    TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation to "/dashboard" until "load"
+    ============================================================
+
+      70 |         await page.click('button[type="submit"]');
+      71 |         // All users navigate to /dashboard after login
+    > 72 |         await page.waitForURL('/dashboard', { timeout: 10000 });
+         |                    ^
+      73 |
+      74 |         // Test dashboard route (admin should have access)
+      75 |         const response = await request.get('/api/dashboard');
+        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:72:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-RBAC---F-f0364-n-can-access-finance-routes-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-RBAC---F-f0364-n-can-access-finance-routes-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/rbac-and-sessions-RBAC---F-f0364-n-can-access-finance-routes-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-RBAC---F-f0364-n-can-access-finance-routes-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../test-results/rbac-and-sessions-RBAC---F-f0364-n-can-access-finance-routes-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
 <system-out>
 <![CDATA[
-[[ATTACHMENT|rbac-and-sessions-RBAC---F-f0364-n-can-access-finance-routes-chromium/test-finished-1.png]]
+[[ATTACHMENT|rbac-and-sessions-RBAC---F-f0364-n-can-access-finance-routes-chromium/test-failed-1.png]]
 
 [[ATTACHMENT|rbac-and-sessions-RBAC---F-f0364-n-can-access-finance-routes-chromium/video.webm]]
+
+[[ATTACHMENT|rbac-and-sessions-RBAC---F-f0364-n-can-access-finance-routes-chromium/error-context.md]]
 
 [[ATTACHMENT|rbac-and-sessions-RBAC---F-f0364-n-can-access-finance-routes-chromium/trace.zip]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="RBAC - Finance Access Restrictions › master can access all routes" classname="rbac-and-sessions.spec.js" time="3.271">
+<testcase name="RBAC - Finance Access Restrictions › master can access all routes" classname="rbac-and-sessions.spec.js" time="13.299">
 <failure message="rbac-and-sessions.spec.js:81:5 master can access all routes" type="FAILURE">
 <![CDATA[  [chromium] › rbac-and-sessions.spec.js:81:5 › RBAC - Finance Access Restrictions › master can access all routes 
 
-    Error: expect(received).not.toBe(expected) // Object.is equality
+    TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation to "/dashboard" until "load"
+    ============================================================
 
-    Expected: not 403
-
+      88 |         await page.click('button[type="submit"]');
+      89 |         // All users navigate to /dashboard after login
+    > 90 |         await page.waitForURL('/dashboard', { timeout: 10000 });
+         |                    ^
+      91 |
+      92 |         // Master should have access to all routes
       93 |         for (const route of FINANCE_ROUTES) {
-      94 |             const response = await request.get(route);
-    > 95 |             expect(response.status()).not.toBe(403);
-         |                                           ^
-      96 |         }
-      97 |     });
-      98 | });
-        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:95:43
+        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:90:20
 
     attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
     ../../test-results/rbac-and-sessions-RBAC---F-e93c5-aster-can-access-all-routes-chromium/test-failed-1.png
@@ -107,20 +147,56 @@
 ]]>
 </system-out>
 </testcase>
-<testcase name="RBAC - Staff Route Restrictions › client cannot access staff routes" classname="rbac-and-sessions.spec.js" time="3.541">
-<system-out>
-<![CDATA[✅ Client blocked from /api/users with status 403
-✅ Client blocked from /api/clients with status 403
+<testcase name="RBAC - Staff Route Restrictions › client cannot access staff routes" classname="rbac-and-sessions.spec.js" time="13.297">
+<failure message="rbac-and-sessions.spec.js:101:5 client cannot access staff routes" type="FAILURE">
+<![CDATA[  [chromium] › rbac-and-sessions.spec.js:101:5 › RBAC - Staff Route Restrictions › client cannot access staff routes 
 
-[[ATTACHMENT|rbac-and-sessions-RBAC---S-dfd55--cannot-access-staff-routes-chromium/test-finished-1.png]]
+    TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation to "/dashboard" until "load"
+    ============================================================
+
+      110 |         await page.click('button[type="submit"]');
+      111 |         // All users navigate to /dashboard after login
+    > 112 |         await page.waitForURL('/dashboard', { timeout: 10000 });
+          |                    ^
+      113 |
+      114 |         // Test staff routes that require staff access
+      115 |         const staffOnlyRoutes = [
+        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:112:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-RBAC---S-dfd55--cannot-access-staff-routes-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-RBAC---S-dfd55--cannot-access-staff-routes-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/rbac-and-sessions-RBAC---S-dfd55--cannot-access-staff-routes-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-RBAC---S-dfd55--cannot-access-staff-routes-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../test-results/rbac-and-sessions-RBAC---S-dfd55--cannot-access-staff-routes-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|rbac-and-sessions-RBAC---S-dfd55--cannot-access-staff-routes-chromium/test-failed-1.png]]
 
 [[ATTACHMENT|rbac-and-sessions-RBAC---S-dfd55--cannot-access-staff-routes-chromium/video.webm]]
+
+[[ATTACHMENT|rbac-and-sessions-RBAC---S-dfd55--cannot-access-staff-routes-chromium/error-context.md]]
 
 [[ATTACHMENT|rbac-and-sessions-RBAC---S-dfd55--cannot-access-staff-routes-chromium/trace.zip]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="RBAC - Staff Route Restrictions › unauthenticated user cannot access protected routes" classname="rbac-and-sessions.spec.js" time="0.449">
+<testcase name="RBAC - Staff Route Restrictions › unauthenticated user cannot access protected routes" classname="rbac-and-sessions.spec.js" time="0.297">
 <failure message="rbac-and-sessions.spec.js:132:5 unauthenticated user cannot access protected routes" type="FAILURE">
 <![CDATA[  [chromium] › rbac-and-sessions.spec.js:132:5 › RBAC - Staff Route Restrictions › unauthenticated user cannot access protected routes 
 
@@ -159,36 +235,72 @@
 ]]>
 </system-out>
 </testcase>
-<testcase name="Session Behavior › session persists across page reloads" classname="rbac-and-sessions.spec.js" time="3.884">
+<testcase name="Session Behavior › session persists across page reloads" classname="rbac-and-sessions.spec.js" time="13.311">
+<failure message="rbac-and-sessions.spec.js:157:5 session persists across page reloads" type="FAILURE">
+<![CDATA[  [chromium] › rbac-and-sessions.spec.js:157:5 › Session Behavior › session persists across page reloads 
+
+    TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation to "/dashboard" until "load"
+    ============================================================
+
+      164 |         await page.click('button[type="submit"]');
+      165 |         // All users navigate to /dashboard after login
+    > 166 |         await page.waitForURL('/dashboard', { timeout: 10000 });
+          |                    ^
+      167 |
+      168 |         // Verify session works
+      169 |         const response1 = await page.request.get('/api/cleaning-jobs');
+        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:166:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-Session--c940b-ersists-across-page-reloads-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-Session--c940b-ersists-across-page-reloads-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/rbac-and-sessions-Session--c940b-ersists-across-page-reloads-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-Session--c940b-ersists-across-page-reloads-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../test-results/rbac-and-sessions-Session--c940b-ersists-across-page-reloads-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
 <system-out>
 <![CDATA[
-[[ATTACHMENT|rbac-and-sessions-Session--c940b-ersists-across-page-reloads-chromium/test-finished-1.png]]
+[[ATTACHMENT|rbac-and-sessions-Session--c940b-ersists-across-page-reloads-chromium/test-failed-1.png]]
 
 [[ATTACHMENT|rbac-and-sessions-Session--c940b-ersists-across-page-reloads-chromium/video.webm]]
+
+[[ATTACHMENT|rbac-and-sessions-Session--c940b-ersists-across-page-reloads-chromium/error-context.md]]
 
 [[ATTACHMENT|rbac-and-sessions-Session--c940b-ersists-across-page-reloads-chromium/trace.zip]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Session Behavior › session check endpoint returns user info" classname="rbac-and-sessions.spec.js" time="3.245">
+<testcase name="Session Behavior › session check endpoint returns user info" classname="rbac-and-sessions.spec.js" time="13.404">
 <failure message="rbac-and-sessions.spec.js:181:5 session check endpoint returns user info" type="FAILURE">
 <![CDATA[  [chromium] › rbac-and-sessions.spec.js:181:5 › Session Behavior › session check endpoint returns user info 
 
-    Error: expect(received).toHaveProperty(path)
+    TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation to "/dashboard" until "load"
+    ============================================================
 
-    Expected path: "user"
-    Received path: []
-
-    Received value: {"authenticated": false}
-
-      195 |
-      196 |         const result = await response.json();
-    > 197 |         expect(result).toHaveProperty('user');
-          |                        ^
-      198 |         expect(result.user).toHaveProperty('username', CREDENTIALS.admin.username);
-      199 |         expect(result.user).toHaveProperty('userType', 'admin');
-      200 |     });
-        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:197:24
+      188 |         await page.click('button[type="submit"]');
+      189 |         // All users navigate to /dashboard after login
+    > 190 |         await page.waitForURL('/dashboard', { timeout: 10000 });
+          |                    ^
+      191 |
+      192 |         // Check session endpoint (with standardized envelope)
+      193 |         const response = await request.get('/api/auth/check');
+        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:190:20
 
     attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
     ../../test-results/rbac-and-sessions-Session--9629c--endpoint-returns-user-info-chromium/test-failed-1.png
@@ -221,22 +333,23 @@
 ]]>
 </system-out>
 </testcase>
-<testcase name="Session Behavior › logout clears session and denies access" classname="rbac-and-sessions.spec.js" time="3.286">
-<failure message="rbac-and-sessions.spec.js:202:5 logout clears session and denies access" type="FAILURE">
-<![CDATA[  [chromium] › rbac-and-sessions.spec.js:202:5 › Session Behavior › logout clears session and denies access 
+<testcase name="Session Behavior › logout clears session and denies access" classname="rbac-and-sessions.spec.js" time="13.432">
+<failure message="rbac-and-sessions.spec.js:205:5 logout clears session and denies access" type="FAILURE">
+<![CDATA[  [chromium] › rbac-and-sessions.spec.js:205:5 › Session Behavior › logout clears session and denies access 
 
-    Error: expect(received).toBeTruthy()
+    TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation to "/dashboard" until "load"
+    ============================================================
 
-    Received: false
-
-      213 |         // Verify authenticated
-      214 |         const beforeLogout = await request.get('/api/cleaning-jobs');
-    > 215 |         expect(beforeLogout.ok()).toBeTruthy();
-          |                                   ^
-      216 |
-      217 |         // Logout
-      218 |         const logoutResponse = await request.post('/api/auth/logout');
-        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:215:35
+      212 |         await page.click('button[type="submit"]');
+      213 |         // All users navigate to /dashboard after login
+    > 214 |         await page.waitForURL('/dashboard', { timeout: 10000 });
+          |                    ^
+      215 |
+      216 |         // Verify authenticated
+      217 |         const beforeLogout = await request.get('/api/cleaning-jobs');
+        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:214:20
 
     attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
     ../../test-results/rbac-and-sessions-Session--eb090-s-session-and-denies-access-chromium/test-failed-1.png
@@ -269,88 +382,66 @@
 ]]>
 </system-out>
 </testcase>
-<testcase name="Session Behavior › concurrent sessions from different users work independently" classname="rbac-and-sessions.spec.js" time="6.741">
+<testcase name="Session Behavior › concurrent sessions from different users work independently" classname="rbac-and-sessions.spec.js" time="13.849">
+<failure message="rbac-and-sessions.spec.js:234:5 concurrent sessions from different users work independently" type="FAILURE">
+<![CDATA[  [chromium] › rbac-and-sessions.spec.js:234:5 › Session Behavior › concurrent sessions from different users work independently 
+
+    TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation to "/dashboard" until "load"
+    ============================================================
+
+      249 |             await workerPage.click('button[type="submit"]');
+      250 |             // All users navigate to /dashboard after login
+    > 251 |             await workerPage.waitForURL('/dashboard', { timeout: 10000 });
+          |                              ^
+      252 |
+      253 |             // Login as client
+      254 |             await clientPage.goto('/');
+        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:251:30
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-Session--8d7af-nt-users-work-independently-chromium/test-failed-2.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-Session--8d7af-nt-users-work-independently-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../test-results/rbac-and-sessions-Session--8d7af-nt-users-work-independently-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../test-results/rbac-and-sessions-Session--8d7af-nt-users-work-independently-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
 <system-out>
 <![CDATA[
-[[ATTACHMENT|rbac-and-sessions-Session--8d7af-nt-users-work-independently-chromium/test-finished-2.png]]
+[[ATTACHMENT|rbac-and-sessions-Session--8d7af-nt-users-work-independently-chromium/test-failed-2.png]]
 
-[[ATTACHMENT|rbac-and-sessions-Session--8d7af-nt-users-work-independently-chromium/test-finished-1.png]]
+[[ATTACHMENT|rbac-and-sessions-Session--8d7af-nt-users-work-independently-chromium/test-failed-1.png]]
 
 [[ATTACHMENT|rbac-and-sessions-Session--8d7af-nt-users-work-independently-chromium/trace.zip]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Health and Readiness Endpoints › health endpoint returns 200 without authentication" classname="rbac-and-sessions.spec.js" time="0.013">
-<failure message="rbac-and-sessions.spec.js:281:5 health endpoint returns 200 without authentication" type="FAILURE">
-<![CDATA[  [chromium] › rbac-and-sessions.spec.js:281:5 › Health and Readiness Endpoints › health endpoint returns 200 without authentication 
-
-    Error: expect(received).toHaveProperty(path, value)
-
-    Expected path: "status"
-
-    Expected value: "healthy"
-    Received value: "ok"
-
-      285 |         const result = await response.json();
-      286 |
-    > 287 |         expect(result).toHaveProperty('status', 'healthy');
-          |                        ^
-      288 |         expect(result).toHaveProperty('timestamp');
-      289 |     });
-      290 |
-        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:287:24
-
-    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
-    ../../test-results/rbac-and-sessions-Health-a-89c71--200-without-authentication-chromium/trace.zip
-    Usage:
-
-        npx playwright show-trace ../../test-results/rbac-and-sessions-Health-a-89c71--200-without-authentication-chromium/trace.zip
-
-    ────────────────────────────────────────────────────────────────────────────────────────────────
-]]>
-</failure>
+<testcase name="Health and Readiness Endpoints › health endpoint returns 200 without authentication" classname="rbac-and-sessions.spec.js" time="0.045">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|rbac-and-sessions-Health-a-89c71--200-without-authentication-chromium/trace.zip]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Health and Readiness Endpoints › readiness endpoint returns database status" classname="rbac-and-sessions.spec.js" time="0.043">
-<failure message="rbac-and-sessions.spec.js:291:5 readiness endpoint returns database status" type="FAILURE">
-<![CDATA[  [chromium] › rbac-and-sessions.spec.js:291:5 › Health and Readiness Endpoints › readiness endpoint returns database status 
-
-    Error: expect(received).toHaveProperty(path)
-
-    Expected path: "database"
-    Received path: []
-
-    Received value: {"checks": {"database": {"latency_ms": 1, "status": "ok"}}, "service": "lavandaria-api", "status": "ready", "timestamp": "2025-10-27T20:56:07.892Z"}
-
-      296 |
-      297 |         expect(result).toHaveProperty('status');
-    > 298 |         expect(result).toHaveProperty('database');
-          |                        ^
-      299 |         expect(result.database).toHaveProperty('connected');
-      300 |
-      301 |         if (result.database.connected) {
-        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/rbac-and-sessions.spec.js:298:24
-
-    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
-    ../../test-results/rbac-and-sessions-Health-a-67343-int-returns-database-status-chromium/trace.zip
-    Usage:
-
-        npx playwright show-trace ../../test-results/rbac-and-sessions-Health-a-67343-int-returns-database-status-chromium/trace.zip
-
-    ────────────────────────────────────────────────────────────────────────────────────────────────
-]]>
-</failure>
+<testcase name="Health and Readiness Endpoints › readiness endpoint returns database status" classname="rbac-and-sessions.spec.js" time="0.018">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|rbac-and-sessions-Health-a-67343-int-returns-database-status-chromium/trace.zip]]
 ]]>
 </system-out>
 </testcase>
-<testcase name="Health and Readiness Endpoints › health and readiness are public (no auth required)" classname="rbac-and-sessions.spec.js" time="0.452">
+<testcase name="Health and Readiness Endpoints › health and readiness are public (no auth required)" classname="rbac-and-sessions.spec.js" time="0.501">
 <system-out>
 <![CDATA[
 [[ATTACHMENT|rbac-and-sessions-Health-a-8e71d-re-public-no-auth-required--chromium/test-finished-1.png]]
