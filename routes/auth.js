@@ -70,18 +70,34 @@ router.post('/login/user', loginLimiter, [
 
         console.log(`✅ [AUTH] Login successful for user: ${username} - Role: ${user.role} [${req.correlationId}]`);
 
-        res.json({
-            success: true,
-            user: {
-                id: user.id,
-                username: user.username,
-                role: user.role,
-                name: user.full_name
-            },
-            _meta: {
-                correlationId: req.correlationId,
-                timestamp: new Date().toISOString()
+        // Save session before responding to ensure it's persisted
+        req.session.save((err) => {
+            if (err) {
+                console.error(`💥 [AUTH] Session save error [${req.correlationId}]:`, err);
+                return res.status(500).json({
+                    error: 'Session save failed',
+                    _meta: {
+                        correlationId: req.correlationId,
+                        timestamp: new Date().toISOString()
+                    }
+                });
             }
+
+            console.log(`💾 [AUTH] Session saved successfully [${req.correlationId}]`);
+
+            res.json({
+                success: true,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    role: user.role,
+                    name: user.full_name
+                },
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
         });
     } catch (error) {
         console.error(`💥 [AUTH] Login error [${req.correlationId}]:`, error);
@@ -156,18 +172,34 @@ router.post('/login/client', loginLimiter, [
 
         console.log(`✅ [AUTH] Client login successful: ${phone} [${req.correlationId}]`);
 
-        res.json({
-            success: true,
-            client: {
-                id: client.id,
-                phone: client.phone,
-                name: client.full_name,
-                mustChangePassword: client.must_change_password
-            },
-            _meta: {
-                correlationId: req.correlationId,
-                timestamp: new Date().toISOString()
+        // Save session before responding to ensure it's persisted
+        req.session.save((err) => {
+            if (err) {
+                console.error(`💥 [AUTH] Session save error [${req.correlationId}]:`, err);
+                return res.status(500).json({
+                    error: 'Session save failed',
+                    _meta: {
+                        correlationId: req.correlationId,
+                        timestamp: new Date().toISOString()
+                    }
+                });
             }
+
+            console.log(`💾 [AUTH] Session saved successfully [${req.correlationId}]`);
+
+            res.json({
+                success: true,
+                client: {
+                    id: client.id,
+                    phone: client.phone,
+                    name: client.full_name,
+                    mustChangePassword: client.must_change_password
+                },
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
         });
     } catch (error) {
         console.error(`💥 [AUTH] Client login error [${req.correlationId}]:`, error);
