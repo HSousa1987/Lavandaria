@@ -190,19 +190,67 @@ app.use('/api/tickets', require('./routes/tickets'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/settings', require('./routes/settings'));
 
-// Serve React app in production
-if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, 'client/build')));
+// Serve React app (production build for E2E testing compatibility)
+// Note: In development, client may run separately on port 3001
+const buildPath = path.join(__dirname, 'client/build');
+app.use(express.static(buildPath));
 
-    app.get('*', (req, res) => {
-        res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-    });
-}
+app.get('*', (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+    // Debug: Log error details
+    console.log(`🔍 [ERROR DEBUG] Error name: ${err.name}, Constructor: ${err.constructor.name}, Message: ${err.message}`);
+
+    // Handle Multer errors (file upload)
+    if (err.name === 'MulterError' || err.constructor.name === 'MulterError') {
+        console.error(`❌ [MULTER ERROR] ${err.message} [${req.correlationId}]`);
+
+        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+            // Too many files uploaded (exceeds array limit)
+            return res.status(400).json({
+                error: 'Maximum 10 photos per upload batch',
+                code: 'BATCH_LIMIT_EXCEEDED',
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({
+                error: 'File too large (max 10MB per file)',
+                code: 'FILE_TOO_LARGE',
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+
+        // Other multer errors
+        return res.status(400).json({
+            error: err.message,
+            code: 'UPLOAD_ERROR',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+
+    // Generic error handler
     console.error(err.stack);
-    res.status(500).json({ error: 'Something went wrong!' });
+    res.status(500).json({
+        error: 'Something went wrong!',
+        _meta: {
+            correlationId: req.correlationId,
+            timestamp: new Date().toISOString()
+        }
+    });
 });
 
 // Start server

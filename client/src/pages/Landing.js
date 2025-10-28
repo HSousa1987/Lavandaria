@@ -7,7 +7,7 @@ const Landing = () => {
   const [formData, setFormData] = useState({ username: '', phone: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
+  const [showLogin, setShowLogin] = useState(true); // Default to login view for immediate access
   const { login, user } = useAuth();
   const navigate = useNavigate();
 
@@ -76,6 +76,7 @@ const Landing = () => {
               </div>
             </div>
             <button
+              data-testid="login-toggle"
               onClick={() => setShowLogin(!showLogin)}
               className="px-6 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
             >

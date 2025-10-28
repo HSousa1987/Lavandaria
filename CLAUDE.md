@@ -1,697 +1,601 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Mandatory as an autonomous agent you will:
+1. Call vibe_check after planning and before major actions.
+2. Provide the full user request and your current plan
+3. Opcionally, record resolved issues with vibe_learn
+
+---
 
 ## Project Overview
 
-**Lavandaria** is a dual-business management system for:
+**Lavandaria** is a dual-business management system serving:
 1. **Laundry Service** - Traditional clothing cleaning with order tracking and itemization
-2. **Airbnb/House Cleaning Service** - Property cleaning with photo verification and time tracking
+2. **Property Cleaning Service** - Airbnb/house cleaning with photo verification and time tracking
 
-The system serves four user roles with strict hierarchical permissions:
-- **Master** (Owner - full system access, can create admins)
-- **Admin** (can create workers, manage clients/orders, finance access)
-- **Worker/Cleaner** (field operations, photo uploads, time tracking, NO finance access)
-- **Client** (view own orders, read-only)
+### Core Capabilities
+- **Multi-Role User Management**: Master → Admin → Worker → Client hierarchy
+- **Order Lifecycle Management**: Status tracking from intake to completion
+- **Photo Verification**: Before/after/detail photos with client viewing tracking
+- **Time Tracking**: Worker clock-in/out with manual entry support
+- **Financial Management**: Split payment tables for referential integrity
+- **Notification System**: Client alerts for order status changes
 
-## Tech Stack
+---
 
-- **Backend**: Node.js 18+ with Express.js 4.18 (CommonJS)
-- **Frontend**: React 19 + React Router 7 + Tailwind CSS 3 (ES6 modules)
-- **Database**: PostgreSQL 16 (single source of truth)
-- **Deployment**: Docker + Docker Compose (Alpine Linux)
-- **Authentication**: Session-based (express-session with PostgreSQL store)
+## Role Boundaries & Expectations
 
-## Critical Architecture Patterns
+### Four-Tier Permission Model
 
-### Request Lifecycle & Middleware Stack
-
-All requests flow through this **exact middleware order** in [server.js](server.js):
-
-```
-1. Helmet.js (Security Headers)
-   ├─ CSP, HSTS (1 year for production), Referrer Policy
-
-2. Morgan (Request Logging)
-   └─ Logs method, URL, status, response time
-
-3. CORS (Cross-Origin)
-   ├─ Whitelist approach (process.env.CORS_ORIGINS)
-   ├─ Credentials enabled (cookies)
-   └─ X-Correlation-Id header exposed
-
-4. JSON/URL-encoded Parsers
-
-5. Correlation ID Middleware (middleware/rateLimiter.js)
-   └─ Adds req.correlationId to every request
-
-6. Session Middleware
-   ├─ PostgreSQL store (connect-pg-simple)
-   ├─ 30-day cookies (configurable via maxAge)
-   └─ HTTP-only + SameSite=lax
-
-7. Route-Specific Permission Middleware (middleware/permissions.js)
-   ├─ requireAuth - any logged-in user
-   ├─ requireMaster - master only
-   ├─ requireMasterOrAdmin - master or admin
-   ├─ requireStaff - master/admin/worker
-   ├─ requireFinanceAccess - master/admin (blocks workers)
-   └─ canManageUsers(targetRole) - context-aware factory
-```
-
-**Key Pattern**: Correlation IDs trace requests through logs and are included in all error responses. Check logs with correlation ID to debug issues.
-
-### Authentication Flow
-
-**Two separate login endpoints** with different strategies:
-
-```
-Staff Login:              Client Login:
-POST /api/auth/login/user    POST /api/auth/login/client
-└─ Username + Password       └─ Phone + Password
-   ├─ Rate Limited (5/15min)    ├─ Rate Limited (5/15min)
-   ├─ Bcrypt verification       ├─ Bcrypt verification
-   └─ Session: userType,        └─ Session: userType='client',
-      userId, username              userId, phone, mustChangePassword
-```
-
-**Frontend Integration** ([src/context/AuthContext.js](client/src/context/AuthContext.js)):
-
-```
-App Load
-  ↓
-GET /api/auth/check (with credentials)
-  ↓
-AuthContext sets user state
-  ↓
-ProtectedRoute enforces role-based routing
-  ↓
-axios.defaults.withCredentials = true (all subsequent requests include cookies)
-```
-
-**Session Persistence**:
-- Sessions stored in PostgreSQL `session` table (survive container restarts)
-- Enables horizontal scaling (shared session store)
-- Admin can query sessions directly for debugging: `SELECT * FROM session;`
-
-### Database Schema & Migration Strategy
-
-**16 Active Tables** (after 2025-10-08 cutover):
-
-**Core Identity:**
-- `users` - Staff with auto-generated usernames
-- `clients` - Customers (phone-based auth)
-- `session` - Express sessions
-
-**Cleaning Jobs** (NEW system):
-- `cleaning_jobs` - Main table (estimated_hours, district, country, payment tracking)
-- `cleaning_job_workers` - Junction for multiple workers per job
-- `cleaning_job_photos` - Before/after/detail photos with uploader tracking
-- `cleaning_time_logs` - Worker time tracking (manual entry support)
-
-**Laundry Orders** (NEW system):
-- `laundry_orders_new` - Orders with worker assignment
-- `laundry_order_items` - Itemized line items
-- `laundry_services` - Service catalog (12 pre-configured)
-
-**Financial** (Split for FK integrity):
-- `payments_cleaning` - FK to cleaning_jobs.id
-- `payments_laundry` - FK to laundry_orders_new.id
-
-**Other:**
-- `tickets` - Worker issue reporting
-- `properties` - Client addresses
-- `job_notifications` - Push notifications
-
-**Migration Execution Order** (CRITICAL - has dependencies):
-
-```bash
-# migrations/ run in deploy.sh in THIS specific order:
-000_user_client_extended_fields.sql    # Adds first_name, last_name, date_of_birth, nif, address
-002_create_jobs_system.sql              # Creates new cleaning_jobs, drops legacy airbnb_orders
-001_standardize_addresses.sql           # Depends on 002! Adds address_line1, city, postal_code, district, country
-003_create_laundry_pricing.sql          # Creates laundry_services, inserts 12 default services
-```
-
-**Why special order?** Migration 001 standardizes addresses across tables created in 002. Running sequentially (000→001→002→003) would fail.
-
-**Backup Tables** (30-day retention, purge 2025-11-08):
-- `backup_20251008_*` (6 tables)
-- `final_backup_20251008_2145_*` (6 tables)
-- Total: ~106 kB
-
-**Dropped Legacy Tables** (2025-10-08):
-- ~~`laundry_orders`~~ → `laundry_orders_new`
-- ~~`airbnb_orders`~~ → `cleaning_jobs`
-- ~~`payments`~~ → `payments_cleaning` + `payments_laundry`
-
-**Why split payment tables?** Single polymorphic FK (job_id OR order_id) violated referential integrity. Two tables maintain clean foreign key constraints.
-
-### Role-Based Access Control (RBAC)
-
-**Four-layer hierarchy** enforced at **two levels**:
-
-1. **Middleware Level** ([middleware/permissions.js](middleware/permissions.js)):
-   ```javascript
-   requireFinanceAccess(req, res, next)
-   // Blocks workers from payments/dashboard routes
-   ```
-
-2. **Query Level** (role-specific WHERE clauses):
-   ```javascript
-   if (req.session.userType === 'worker') {
-     query = 'SELECT * FROM cleaning_jobs cj ' +
-             'JOIN cleaning_job_workers cjw ON cj.id = cjw.job_id ' +
-             'WHERE cjw.worker_id = $1';
-     params = [req.session.userId];
-   } else {
-     query = 'SELECT * FROM cleaning_jobs';
-     params = [];
-   }
-   ```
-
-**Permission Matrix**:
-
-| Action | Master | Admin | Worker | Client |
-|--------|--------|-------|--------|--------|
-| Create Admin Users | ✅ | ❌ | ❌ | ❌ |
-| Create Workers | ✅ | ✅ | ❌ | ❌ |
-| Manage Clients | ✅ | ✅ | ❌ | ❌ |
-| View All Orders | ✅ | ✅ | ❌ | ❌ |
-| View Assigned Orders | ✅ | ✅ | ✅ | ❌ |
-| Finance Access | ✅ | ✅ | ❌ | ❌ |
-| Upload Photos | ✅ | ✅ | ✅ | ❌ |
-| Create Tickets | ✅ | ✅ | ✅ | ❌ |
-
-### Response Envelope Pattern
-
-**All API responses** use standardized helpers from [middleware/validation.js](middleware/validation.js):
-
-```javascript
-// List endpoints
-listResponse(res, items, { total, limit, offset }, req)
-// → { success: true, data: [...], _meta: { correlationId, timestamp, total, limit, offset, count } }
-
-// Success
-successResponse(res, { user }, 200, req)
-// → { success: true, user: {...}, _meta: { correlationId, timestamp } }
-
-// Errors
-errorResponse(res, 404, 'Not found', 'RESOURCE_NOT_FOUND', req)
-// → { error: "Not found", code: "RESOURCE_NOT_FOUND", _meta: { correlationId, timestamp } }
-
-// Validation errors
-handleValidationErrors(req, res, next)
-// → { error: "Validation failed", code: "VALIDATION_ERROR", details: [...], _meta: {...} }
-```
-
-**Pattern to replicate** when adding new endpoints:
-
-```javascript
-const { listResponse, validatePagination, errorResponse } = require('../middleware/validation');
-const { requireMasterOrAdmin } = require('../middleware/permissions');
-
-router.get('/', requireMasterOrAdmin, async (req, res) => {
-  try {
-    const { limit, offset } = validatePagination(req);
-
-    // Build role-filtered query
-    let query = 'SELECT * FROM table';
-    let params = [];
-
-    if (req.session.userType === 'worker') {
-      query += ' WHERE assigned_to = $1';
-      params.push(req.session.userId);
-    }
-
-    // Parallel queries for performance
-    const [result, countResult] = await Promise.all([
-      pool.query(query + ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-        [...params, limit, offset]),
-      pool.query('SELECT COUNT(*) FROM table' + (params.length ? ' WHERE assigned_to = $1' : ''),
-        params.length ? [req.session.userId] : [])
-    ]);
-
-    return listResponse(res, result.rows, {
-      total: parseInt(countResult.rows[0].count),
-      limit,
-      offset
-    }, req);
-  } catch (error) {
-    console.error(`❌ [ERROR] Failed to fetch:`, error);
-    return errorResponse(res, 500, 'Server error', 'SERVER_ERROR', req);
-  }
-});
-```
-
-### File Upload Pattern
-
-Photos stored in `uploads/cleaning_photos/` via multer:
-
-```javascript
-// routes/cleaning-jobs.js:25-35
-const upload = multer({
-  destination: 'uploads/cleaning_photos/',
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (extname && mimetype) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed'));
-    }
-  }
-});
-
-router.post('/:id/photos', requireStaff, upload.array('photos', 10), async (req, res) => {
-  // req.files contains uploaded files
-  // Insert into cleaning_job_photos with uploaded_by = req.session.userId
-});
-```
-
-## One-Command Deployment
-
-**CRITICAL**: Always use [deploy.sh](deploy.sh) for deployment - handles complex orchestration:
-
-```bash
-./deploy.sh
-```
-
-**What it does** (50 seconds total):
-
-1. **Pre-flight Checks**
-   - Docker installed and running
-   - Docker Compose available (v1 or v2)
-   - Creates `uploads/`, `logs/` directories
-
-2. **Configuration**
-   - Creates `.env` from `.env.example` if missing
-   - Generates secure SESSION_SECRET (32-byte hex)
-   - Validates SESSION_SECRET strength (min 32 chars, exits if weak)
-
-3. **Container Lifecycle**
-   - Stops existing containers with `docker-compose down -v` (removes volumes)
-   - Rebuilds with `--no-cache`
-   - Starts db + app with health checks
-
-4. **Database Initialization**
-   - Waits for `pg_isready`
-   - Runs migrations in order: 000 → 002 → 001 → 003
-   - Verifies required tables exist
-
-5. **Application Readiness**
-   - Polls `/api/healthz` (liveness)
-   - Checks `/api/readyz` (readiness + DB latency)
-   - Monitors Docker healthchecks
-
-6. **Post-deployment**
-   - Displays URLs, credentials, useful commands
-
-**Environment Variables** (critical):
-
-```env
-# Required (exits on missing)
-SESSION_SECRET=<32+ char hex string>  # Auto-generated if missing
-DB_HOST=db
-DB_USER=lavandaria
-DB_PASSWORD=lavandaria2025
-DB_NAME=lavandaria
-
-# Optional (with defaults)
-NODE_ENV=production
-PORT=3000
-CORS_ORIGINS=http://localhost:3000,http://localhost:3001
-```
-
-## Common Development Workflows
-
-### Full Stack Development
-
-```bash
-# Option 1: Concurrently (recommended)
-npm install              # Install root dependencies
-npm run dev              # Runs server + client
-# Backend: http://localhost:3000 (nodemon auto-reload)
-# Frontend: http://localhost:3001 (proxies API to :3000)
-
-# Option 2: Separate terminals
-docker-compose up -d db          # Terminal 1: Database only
-npm run server                    # Terminal 2: Backend (nodemon)
-cd client && npm start            # Terminal 3: Frontend (port 3001)
-```
-
-### Database Operations
-
-```bash
-# Connect to container
-docker exec -it lavandaria-db psql -U lavandaria -d lavandaria
-
-# Query
-docker exec -it lavandaria-db psql -U lavandaria -d lavandaria -c "SELECT * FROM users;"
-
-# Backup
-docker exec lavandaria-db pg_dump -U lavandaria lavandaria > backup.sql
-
-# Restore
-cat backup.sql | docker exec -i lavandaria-db psql -U lavandaria lavandaria
-
-# View active sessions (debugging)
-docker exec -it lavandaria-db psql -U lavandaria -d lavandaria -c "SELECT * FROM session;"
-```
-
-### Debugging with Correlation IDs
-
-```bash
-# View logs with correlation ID tracing
-docker-compose logs -f app | grep "req_1729..."
-
-# Test endpoint with custom correlation ID
-curl -X POST http://localhost:3000/api/auth/login/user \
-  -H "Content-Type: application/json" \
-  -H "X-Correlation-Id: test-login-123" \
-  -d '{"username":"master","password":"master123"}' \
-  -c cookies.txt
-
-# Use cookie in subsequent requests
-curl http://localhost:3000/api/users \
-  -b cookies.txt \
-  -H "X-Correlation-Id: test-users-456"
-
-# Response includes correlation ID in _meta
-jq '._meta.correlationId' response.json
-```
-
-### Testing Login & Rate Limiting
-
-```bash
-# Login and save cookies
-curl -X POST http://localhost:3000/api/auth/login/user \
-  -H "Content-Type: application/json" \
-  -d '{"username":"master","password":"master123"}' \
-  -c cookies.txt
-
-# Test rate limiter (5 attempts per 15 minutes)
-for i in {1..6}; do
-  echo "=== Attempt $i ==="
-  curl -X POST http://localhost:3000/api/auth/login/user \
-    -H "Content-Type: application/json" \
-    -d '{"username":"wrong","password":"wrong"}' \
-    -i | grep -E "^HTTP/|RATE_LIMIT_EXCEEDED"
-done
-# 6th attempt returns 429 with retryAfter: 900
-```
-
-## Default Credentials
-
-**Master (Owner):**
-- Username: `master`
-- Password: `master123`
+**Master (Owner)**
 - Full system access
+- Can create admins
+- Finance access
+- User management: all roles
 
-**Admin (Manager):**
-- Username: `admin`
-- Password: `admin123`
+**Admin (Manager)**
+- Can create workers & clients
+- Manage all orders and jobs
+- Finance access
 - Cannot create other admins
 
-**Worker (Cleaner):**
-- Username: `worker1`
-- Password: `worker123`
-- No finance access
+**Worker (Field Operations)**
+- View assigned jobs only
+- Upload photos to assigned jobs
+- Track time for assigned jobs
+- **NO finance access**
 
-**Sample Client:**
-- Phone: `911111111`
-- Password: `lavandaria2025` (must change on first login)
+**Client (Customer)**
+- View own orders (read-only)
+- View photos for own jobs
+- Provide feedback/ratings
 
-**New Clients:**
-- Default password: `lavandaria2025`
-- Forced to change password on first login via [src/pages/ChangePassword.js](client/src/pages/ChangePassword.js)
+---
 
-## Route Structure
+## Request/Response & Correlation ID Conventions
 
-### Active Routes
+### Standardized Response Envelope
 
-| Route File | Auth Required | Permission Middleware | Purpose |
-|-----------|---------------|----------------------|---------|
-| [routes/auth.js](routes/auth.js) | Selective | N/A | Login, logout, password change |
-| [routes/users.js](routes/users.js) | Yes | `canManageUsers()` | Staff CRUD (context-aware) |
-| [routes/clients.js](routes/clients.js) | Yes | `requireMasterOrAdmin` | Client CRUD |
-| [routes/cleaning-jobs.js](routes/cleaning-jobs.js) | Yes | `requireStaff` | Cleaning jobs with photos/time |
-| [routes/laundry-orders.js](routes/laundry-orders.js) | Yes | `requireStaff` | Laundry orders |
-| [routes/laundry-services.js](routes/laundry-services.js) | Yes | Mixed | Service catalog |
-| [routes/payments.js](routes/payments.js) | Yes | `requireFinanceAccess` | **Blocks workers** |
-| [routes/dashboard.js](routes/dashboard.js) | Yes | `requireFinanceAccess` | **Blocks workers** |
-| [routes/tickets.js](routes/tickets.js) | Yes | `requireStaff` | Issue reporting |
-| [routes/properties.js](routes/properties.js) | Yes | `requireMasterOrAdmin` | Client addresses |
-| [routes/settings.js](routes/settings.js) | Yes | `requireMaster` | System settings |
-| [routes/health.js](routes/health.js) | **No** | Public | Health checks |
-
-### Deprecated Routes (Return 410 Gone)
-
-- `routes/laundry.js` - Old laundry system
-- `routes/airbnb.js` - Old Airbnb system
-- `routes/services.js` - Old services
-
-## Frontend Architecture
-
-### Page Components
-
-| Page | Route | Access | Features |
-|------|-------|--------|----------|
-| [Landing.js](client/src/pages/Landing.js) | `/` | Public | Dual login (staff + client) |
-| [Dashboard.js](client/src/pages/Dashboard.js) | `/dashboard` | All roles | Routes to role-specific dashboards |
-| [AdminDashboard.js](client/src/pages/AdminDashboard.js) | `/admin` | Master/Admin | CRM, orders, payments, services |
-| [MasterDashboard.js](client/src/pages/MasterDashboard.js) | `/master` | Master | Settings, user management |
-| [WorkerDashboard.js](client/src/pages/WorkerDashboard.js) | `/worker` | Worker | Job list, photo upload, time tracking |
-| [ClientDashboard.js](client/src/pages/ClientDashboard.js) | `/client` | Client | My orders, photos, status |
-| [ChangePassword.js](client/src/pages/ChangePassword.js) | `/change-password` | Client | Forced password change |
-
-### State Management
-
-[src/context/AuthContext.js](client/src/context/AuthContext.js) provides:
+All API responses follow this pattern:
 
 ```javascript
-export const useAuth = () => {
-  // State
-  user          // { id, username/phone, userType, ... }
-  loading       // Boolean
-
-  // Actions
-  login(credentials)
-  logout()
-  changePassword(oldPassword, newPassword)
-
-  // Computed
-  isAuthenticated
-  isMaster
-  isAdmin
-  isWorker
-  isClient
+{
+  "success": true|false,
+  "data": { ... },      // or "error": "message"
+  "_meta": {
+    "timestamp": "2025-10-23T01:23:45.678Z",
+    "correlationId": "req_1729..."
+  }
 }
 ```
 
-**Pattern**: Context provides authentication state. No Redux - simpler for this use case.
+### Correlation IDs
 
-### Build Process
+Every request receives a unique correlation ID for tracing:
 
-- **Development**: Port 3001 with proxy to localhost:3000
-- **Production**: Built to `client/build/`, served by Express static middleware
-
-```bash
-# Production build
-cd client
-npm run build
-# Generates optimized bundle in client/build/
-# Served via server.js: app.use(express.static(path.join(__dirname, 'client/build')))
+```http
+X-Correlation-Id: req_1729638225678_abc123
 ```
 
-## Security Features
+**Usage:**
+- Included in all log messages
+- Returned in error responses
+- Essential for debugging failed requests
 
-- **Passwords**: Bcrypt hashing (cost factor 10)
-- **Sessions**: PostgreSQL store (persistent, scalable)
-- **Cookies**: HTTP-only + SameSite=lax (CSRF protection)
-- **Headers**: Helmet.js (CSP, HSTS, referrer policy)
-- **SQL Injection**: Parameterized queries (all queries use $1, $2, etc.)
-- **Input Validation**: express-validator chains
-- **Rate Limiting**: Login endpoints (5 attempts per 15 minutes per IP)
-- **CORS**: Whitelist approach (CORS_ORIGINS env var)
+**Example:**
+```bash
+# Search logs by correlation ID
+docker-compose logs -f app | grep "req_1729638225678"
+```
 
-## Key Architectural Decisions
+---
 
-### Why Dual Login Endpoints?
+## Terminal-First Testing Workflow
 
-- `/api/auth/login/user` (username-based) vs `/api/auth/login/client` (phone-based)
-- **Reason**: Different authentication strategies, password policies, rate limiting
-- **Benefit**: Separate session data (userType, different forced password flows)
+### Recommended Test Sequence
 
-### Why PostgreSQL Session Store?
+**1. Seed Test Data**
+```bash
+npm run test:seed
+```
+Creates: master, admin, worker1, client with known passwords
 
-- Sessions survive container restarts
-- Shared sessions across multiple app instances (horizontal scaling)
-- Admin can query sessions for debugging
-- Better than memory store for production
+**2. Run E2E Tests (Headless)**
+```bash
+npm run test:e2e
+```
+Runs all Playwright tests in terminal, collects screenshots/traces
 
-### Why Split Payment Tables?
+**3. View Results**
+```bash
+npm run test:e2e:report
+```
+Opens HTML report in browser
 
-- **Problem**: Single `payments` table with polymorphic FK (job_id OR order_id) had NULL values
-- **Solution**: `payments_cleaning` (FK to cleaning_jobs.id) + `payments_laundry` (FK to laundry_orders_new.id)
-- **Benefit**: Referential integrity maintained, no NULL FKs
+**4. Debug Failures (Playwright UI)**
+```bash
+npm run test:e2e:ui
+```
+Opens Playwright UI for trace replay and debugging
 
-### Why Emoji Logging?
+### Test Coverage
 
-- **Pattern**: Console logs prefixed with emojis for easy scanning
-  - `❌` Error
-  - `✅` Success
-  - `🔐` Auth
-  - `📊` Data
-  - `🚫` Rate limited
-- **Benefit**: Quickly identify log types in Docker logs without color support
+| Suite | File | Scenarios |
+|-------|------|-----------|
+| Worker Photo Upload | `tests/e2e/worker-photo-upload.spec.js` | Batch uploads, RBAC, invalid files |
+| Client Photo Viewing | `tests/e2e/client-photo-viewing.spec.js` | Pagination, viewing tracking |
+| RBAC & Sessions | `tests/e2e/rbac-and-sessions.spec.js` | Finance restrictions, session persistence |
+| Tab Navigation | `tests/e2e/tab-navigation.spec.js` | Keyboard accessibility |
 
-### Why Correlation IDs?
+---
 
-- Every request gets unique ID via `X-Correlation-Id` header
-- Enables request tracing through logs
-- Included in error responses for debugging
-- Helps trace multi-request workflows (e.g., login → fetch users → create order)
+## Using MCPs in This Repository
 
-## Common Patterns to Replicate
+### PostgreSQL-RO MCP
 
-### Adding a New List Endpoint with Pagination
+**Purpose:** Database schema inspection, query analysis, performance monitoring
+
+**Connection String:**
+```bash
+postgresql://lavandaria:lavandaria2025@localhost:5432/lavandaria
+```
+
+**Common Operations:**
+```bash
+# Get schema info
+pg_manage_schema --operation get_info
+
+# Analyze index usage
+pg_manage_indexes --operation analyze_usage --showUnused true
+
+# List constraints
+pg_manage_constraints --operation get
+
+# Monitor database
+pg_monitor_database --includeQueries true
+```
+
+### Playwright MCP
+
+**Purpose:** E2E testing with browser automation
+
+**Common Operations:**
+```bash
+# Navigate and snapshot
+browser_navigate --url http://localhost:3000
+browser_snapshot
+
+# Interact with elements
+browser_click --element "Login button" --ref <ref>
+browser_type --element "Username field" --ref <ref> --text "admin"
+
+# Take screenshots
+browser_take_screenshot --filename "test-result.png"
+```
+
+### Context7 MCP
+
+**Purpose:** Domain terminology validation and code snippet discovery
+
+**Library ID:** `/hsousa1987/lavandaria` (494 code snippets)
+
+**Common Operations:**
+```bash
+# Validate workflows
+get-library-docs --context7CompatibleLibraryID /hsousa1987/lavandaria \
+  --topic "order lifecycle workflows"
+
+# Get code examples
+get-library-docs --context7CompatibleLibraryID /hsousa1987/lavandaria \
+  --topic "photo upload patterns" --tokens 3000
+```
+
+### Linear MCP (if configured)
+
+**Purpose:** Issue tracking and project management
+
+**Common Operations:**
+```bash
+# Create issue for bug
+linear_create_issue --title "P1: Client photo viewing pagination failure" \
+  --description "..." --priority 1
+
+# Link issue to PR
+linear_link_issue --issueId <id> --prUrl <url>
+```
+
+### Vibe Check MCP
+
+**Purpose:** Autonomous agent validation and learning feedback loop
+
+**Installation:**
+```bash
+# Already installed globally and configured in .claude.json
+npm list -g @pv-bhat/vibe-check-mcp
+```
+
+**Required Usage Pattern:**
+
+As mandated at the top of this file, Claude must:
+1. Call `vibe_check` after planning and before major actions
+2. Provide the full user request and current plan
+3. Optionally record resolved issues with `vibe_learn`
+
+**Common Operations:**
+```bash
+# Validate plan before execution (MANDATORY)
+vibe_check --userRequest "Diagnose P0 auth failure" \
+  --plan "1. Evidence sweep 2. Flow inspection 3. Hypothesis testing..."
+
+# Record successful resolution pattern (OPTIONAL)
+vibe_learn --issue "Session cookies not persisting across requests" \
+  --resolution "Added SameSite=lax and domain=localhost to cookie options" \
+  --category "authentication"
+```
+
+**Verification:**
+```bash
+# After restarting Claude Code, verify connection
+/mcp  # Should list 'vibe-check' as connected
+
+# Run verification script
+./scripts/verify-vibe-check.sh
+```
+
+---
+
+## Docs Auto-Update Contract
+
+### Mandatory Documentation Updates
+
+Before considering **any task done**, update and commit:
+
+**1. [docs/progress.md](docs/progress.md)**
+- Today's "Planned / Doing / Done" with links to PRs and test artifacts
+
+**2. [docs/decisions.md](docs/decisions.md)**
+- Any policy or behavior choices made (context, options, decision, consequences)
+
+**3. [docs/bugs.md](docs/bugs.md)**
+- Evidence, root cause, fix summary, tests added, PR link for each bug
+
+**4. [docs/architecture.md](docs/architecture.md)**
+- Any change in states, flows, or relationships discovered
+
+**5. [docs/security.md](docs/security.md)**
+- Checklist notes when auth/sessions/uploads/CORS/rate limits/logging are touched
+
+**6. [README.md](README.md)**
+- Update glossary/index if entry points or doc locations changed
+
+**Commit Message Pattern:**
+```bash
+git commit -m "docs: auto-update progress/decisions/bugs (+refs)"
+# or
+git commit -m "docs: no-op update" # if nothing changed
+```
+
+---
+
+## Security Minimums
+
+### Authentication & Authorization
+
+**Session Management:**
+- PostgreSQL-backed sessions (persistent, scalable)
+- HTTP-only cookies (XSS protection)
+- SameSite=lax (CSRF mitigation)
+- 30-day session duration
+
+**Password Security:**
+- Bcrypt hashing (cost factor 10)
+- Default passwords force change (`must_change_password`)
+- No plaintext passwords in logs
+
+**RBAC Enforcement:**
+- Middleware level: `requireAuth`, `requireMaster`, `requireFinanceAccess`, etc.
+- Query level: Role-specific WHERE clauses
+
+### Input Validation & Injection Prevention
+
+**SQL Injection:**
+- 100% parameterized queries (`$1`, `$2`, etc.)
+- No string concatenation in SQL
+
+**File Upload Security:**
+- Type whitelist: JPEG, JPG, PNG, GIF only
+- 10MB file size limit per upload
+- Batch limit: 10 files per request
+
+**Rate Limiting:**
+- Login endpoints: 5 attempts per 15 minutes per IP
+- Returns 429 status with `retryAfter` seconds
+
+### Network Security
+
+**CORS:**
+- Whitelist approach (`CORS_ORIGINS` env var)
+- Credentials enabled (cookies)
+- No wildcard origins
+
+**HTTP Headers (Helmet.js):**
+- Content Security Policy (CSP)
+- HTTP Strict Transport Security (HSTS)
+- X-Frame-Options: DENY
+- X-Content-Type-Options: nosniff
+
+### Open Security Items
+
+**High Priority:**
+1. **HTTPS Enforcement (Production)** - Deploy behind reverse proxy with SSL/TLS
+2. **Database User Separation** - Create read-only user for queries
+3. **API Key for Mobile/External Integrations** - Implement JWT or API key auth
+
+**Medium Priority:**
+4. **Two-Factor Authentication (2FA)** - Add TOTP for Master/Admin roles
+5. **Password Complexity Requirements** - Enforce length, character variety
+6. **Dependency Vulnerability Scanning** - Automate with Dependabot/Snyk
+
+---
+
+## Photo Policy
+
+### Upload Policy
+
+**Unlimited Total Photos per Job**
+- No limit on total number of photos
+- Supports comprehensive documentation
+
+**Batch Cap: 10 Files per Request**
+- Practical limit for single upload operation
+- Prevents server overload
+- Multiple batches allowed
+
+**File Constraints:**
+- **Max size**: 10MB per file
+- **Allowed types**: JPEG, JPG, PNG, GIF
+- **Validation**: Multer fileFilter + extension check
+
+### Access Control
+
+**Worker Upload:**
+- Workers can only upload photos to **assigned jobs**
+- Query-level filtering: `WHERE worker_id = $1`
+- RBAC enforced via middleware
+
+**Client Viewing:**
+- Clients can only view photos for **their own jobs**
+- Query-level filtering: `WHERE client_id = $1`
+- Pagination for large photo sets
+- Viewing status tracked (`viewed_by_client`, `viewed_at`)
+
+### Error Handling
+
+All negative cases emit standardized error envelopes:
 
 ```javascript
-const { listResponse, validatePagination, errorResponse } = require('../middleware/validation');
-const { requireMasterOrAdmin } = require('../middleware/permissions');
-
-router.get('/', requireMasterOrAdmin, async (req, res) => {
-  try {
-    // 1. Validate pagination params
-    const { limit, offset, sort, order } = validatePagination(req);
-
-    // 2. Build role-specific query
-    let query = 'SELECT * FROM table';
-    let countQuery = 'SELECT COUNT(*) FROM table';
-    let params = [];
-
-    if (req.session.userType === 'worker') {
-      const whereClause = ' WHERE assigned_to = $1';
-      query += whereClause;
-      countQuery += whereClause;
-      params.push(req.session.userId);
-    }
-
-    // 3. Add sorting and pagination
-    query += ` ORDER BY ${sort} ${order} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-
-    // 4. Execute queries in parallel for performance
-    const [result, countResult] = await Promise.all([
-      pool.query(query, [...params, limit, offset]),
-      pool.query(countQuery, params)
-    ]);
-
-    // 5. Return standardized envelope
-    return listResponse(res, result.rows, {
-      total: parseInt(countResult.rows[0].count),
-      limit,
-      offset
-    }, req);
-  } catch (error) {
-    console.error(`❌ [ERROR] Failed to fetch [${req.correlationId}]:`, error);
-    return errorResponse(res, 500, 'Server error', 'SERVER_ERROR', req);
+{
+  "success": false,
+  "error": "BATCH_LIMIT_EXCEEDED",
+  "message": "Maximum 10 files per batch",
+  "_meta": {
+    "correlationId": "req_...",
+    "timestamp": "..."
   }
-});
+}
 ```
 
-### Adding File Upload
+**Error Cases:**
+- Over-batch (>10 files)
+- Invalid type/size
+- Unauthorized (not assigned)
+- Wrong ownership (client viewing another's job)
 
+---
+
+## Domain Workflows
+
+### Laundry Order Lifecycle
+
+```text
+received → in_progress → ready → collected
+             ↓
+         cancelled
+```
+
+**Status Definitions:**
+- `received` - Order received from client
+- `in_progress` - Being processed by worker
+- `ready` - Ready for client pickup (notification sent)
+- `collected` - Client picked up order
+- `cancelled` - Order cancelled
+
+**Order Types:**
+- `bulk_kg` - Charged by weight (default: €3.50/kg)
+- `itemized` - Individual item pricing via service catalog
+- `house_bundle` - Fixed-price package
+
+### Cleaning Job Lifecycle
+
+```text
+scheduled → in_progress → completed
+     ↓
+ cancelled
+```
+
+**Status Definitions:**
+- `scheduled` - Job scheduled with date/time
+- `in_progress` - Worker on-site, time tracking active
+- `completed` - Job finished, photos uploaded
+- `cancelled` - Job cancelled
+
+**Job Types:**
+- `airbnb` - Short-term rental property cleaning
+- `house` - Residential house cleaning
+
+### Photo Verification Workflow
+
+```text
+Worker Upload (10 photos/batch, unlimited total):
+┌────────┐     ┌────────┐     ┌────────┐
+│ before │     │ after  │     │ detail │
+└────┬───┘     └────┬───┘     └────┬───┘
+     │              │              │
+     └──────────────┼──────────────┘
+                    │
+            ┌───────▼────────┐
+            │ Photo Metadata │
+            │ • room_area    │
+            │ • caption      │
+            │ • file_size_kb │
+            └───────┬────────┘
+                    │
+            ┌───────▼────────┐
+            │ Client Viewing │
+            │ • viewed_by    │
+            │ • viewed_at    │
+            └────────────────┘
+```
+
+---
+
+## Development Patterns
+
+### Backend (Node.js)
+
+**CommonJS Modules:**
 ```javascript
-const multer = require('multer');
-const path = require('path');
+const express = require('express');
+module.exports = { ... };
+```
 
-const upload = multer({
-  destination: 'uploads/photos/',
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif/;
-    const valid = allowedTypes.test(path.extname(file.originalname).toLowerCase()) &&
-                  allowedTypes.test(file.mimetype);
-    cb(valid ? null : new Error('Only images allowed'), valid);
+**Parameterized Queries:**
+```javascript
+// ✅ Correct
+const result = await pool.query(
+  'SELECT * FROM orders WHERE client_id = $1',
+  [clientId]
+);
+
+// ❌ Never do this
+const result = await pool.query(
+  `SELECT * FROM orders WHERE client_id = ${clientId}`
+);
+```
+
+**Correlation IDs in Logs:**
+```javascript
+console.log(`[${correlationId}] Order created: ${orderId}`);
+```
+
+**Standard Response Envelope:**
+```javascript
+return res.json({
+  success: true,
+  data: { order },
+  _meta: {
+    timestamp: new Date().toISOString(),
+    correlationId: req.correlationId
   }
 });
-
-router.post('/:id/upload', requireStaff, upload.array('photos', 10), async (req, res) => {
-  try {
-    const files = req.files; // Array of uploaded files
-
-    // Insert file records
-    for (const file of files) {
-      await pool.query(
-        'INSERT INTO photos (job_id, filename, uploaded_by) VALUES ($1, $2, $3)',
-        [req.params.id, file.filename, req.session.userId]
-      );
-    }
-
-    return successResponse(res, { uploaded: files.length }, 200, req);
-  } catch (error) {
-    console.error(`❌ [UPLOAD] Failed [${req.correlationId}]:`, error);
-    return errorResponse(res, 500, 'Upload failed', 'UPLOAD_ERROR', req);
-  }
-});
 ```
 
-## Troubleshooting
+### Frontend (React)
 
-**Database won't start:**
+**ES6 Modules:**
+```javascript
+import React from 'react';
+export default Component;
+```
+
+**Tailwind Utility Classes:**
+```jsx
+<button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+  Submit
+</button>
+```
+
+**Axios with Credentials:**
+```javascript
+axios.defaults.withCredentials = true;
+```
+
+### Database
+
+**Explicit ON DELETE Policies:**
+```sql
+-- Client deletion cascades to jobs/orders
+client_id FK ON DELETE CASCADE
+
+-- Worker deletion preserves historical data
+assigned_worker_id FK ON DELETE SET NULL
+```
+
+**CHECK Constraints:**
+```sql
+status CHECK (status IN ('received', 'in_progress', 'ready', 'collected', 'cancelled'))
+```
+
+**Indexes on Critical Fields:**
+```sql
+CREATE INDEX idx_orders_client ON orders(client_id);
+CREATE INDEX idx_orders_status ON orders(status);
+```
+
+---
+
+## Useful Commands
+
+### Docker Operations
 ```bash
-docker-compose down -v  # Remove volumes
-./deploy.sh             # Redeploy
+npm run docker:build      # Build containers
+npm run docker:up         # Start services
+npm run docker:down       # Stop services
+npm run docker:logs       # View logs
 ```
 
-**Migrations fail:**
+### Database Operations
 ```bash
-# Check migration execution order in deploy.sh
-# Verify database is ready: docker exec -it lavandaria-db pg_isready
-# View migration errors: docker-compose logs -f app
+# Connect to database
+docker exec -it lavandaria-db psql -U lavandaria -d lavandaria
+
+# Query sessions
+docker exec -it lavandaria-db psql -U lavandaria -d lavandaria -c "SELECT * FROM session;"
+
+# Backup database
+docker exec lavandaria-db pg_dump -U lavandaria lavandaria > backup.sql
 ```
 
-**Session issues (not authenticated after login):**
+### Development Shortcuts
 ```bash
-# Check SESSION_SECRET is set and strong (32+ chars)
-# Verify session table exists: docker exec -it lavandaria-db psql -U lavandaria -d lavandaria -c "\dt session"
-# Check cookies are being set: curl -v http://localhost:3000/api/auth/login/user
+npm run dev               # Run server + client concurrently
+npm run server            # Backend only (nodemon)
+npm run client            # Frontend only (port 3001)
+npm run build             # Production build
+npm start                 # Production server
 ```
 
-**Port conflicts:**
+### Testing
 ```bash
-# Edit docker-compose.yml ports section
-# Change "3000:3000" to "3001:3000" etc.
+npm run test:seed         # Seed test data
+npm run test:e2e          # Run E2E tests (headless)
+npm run test:e2e:ui       # Debug in Playwright UI
+npm run test:e2e:report   # Open HTML report
 ```
 
-**Permission issues with uploads:**
-```bash
-chmod -R 755 uploads/
-```
+---
 
-**React build errors:**
-```bash
-cd client
-rm -rf node_modules package-lock.json
-npm install
-npm run build
-```
+## Quick Reference Links
 
-**Rate limiting during development:**
-```bash
-# Wait 15 minutes or restart app to clear rate limit store
-docker-compose restart app
-```
+- **Documentation**: [`docs/`](docs/)
+- **Architecture**: [`docs/architecture.md`](docs/architecture.md)
+- **Security**: [`docs/security.md`](docs/security.md)
+- **Progress**: [`docs/progress.md`](docs/progress.md)
+- **Bugs**: [`docs/bugs.md`](docs/bugs.md)
+- **Decisions**: [`docs/decisions.md`](docs/decisions.md)
+- **GitHub**: [HSousa1987/Lavandaria](https://github.com/HSousa1987/Lavandaria)
 
-## Access URLs
+---
 
-- **Frontend (production)**: http://localhost:3000
-- **Frontend (dev)**: http://localhost:3001
-- **Backend API**: http://localhost:3000/api
-- **Database**: localhost:5432
-- **Health Check**: http://localhost:3000/api/healthz
-- **Readiness Check**: http://localhost:3000/api/readyz
+**Last Updated:** 2025-10-23
+**Version:** 1.0.0 (Post-Cutover)

@@ -30,7 +30,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: production
+      NODE_ENV: development  # Changed from 'production' to allow E2E testing without rate limits
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: lavandaria

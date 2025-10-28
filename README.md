@@ -1,323 +1,497 @@
-# 🧺 Lavandaria - Laundry & Airbnb Cleaning Management System
+# Lavandaria
 
-A complete business management system for laundry services and Airbnb property cleaning with photo verification, time tracking, and financial management.
+> **Dual-Business Management System**
+> Laundry Service + Property Cleaning with Photo Verification
 
-## 🚀 Quick Start
-
-**One-command deployment:**
-
-```bash
-./deploy.sh
-```
-
-Access the application at: **http://localhost:3000**
-
-## 📋 What's Included
-
-### ✅ Complete Features:
-- **Multi-role user system** (Master, Admin, Worker, Client)
-- **Client CRM** with full CRUD operations
-- **Laundry order management** with service catalog
-- **Airbnb cleaning orders** with photo verification
-- **Time tracking** for workers
-- **Payment & finance tracking** (hidden from workers)
-- **Ticket system** for workers to report issues
-- **Service catalog** with 12 pre-configured services
-- **Order items breakdown** for detailed invoicing
-- **Status history tracking** for all orders
-
-### 🔐 Default Login Credentials:
-
-**Master (Full Access):**
-- Username: `master`
-- Password: `master123`
-
-**Admin (Finance + Management):**
-- Username: `admin`
-- Password: `admin123`
-
-**Worker (Operations Only):**
-- Username: `worker1`
-- Password: `worker123`
-
-**Sample Client:**
-- Phone: `911111111`
-- Password: `lavandaria2025`
-
-⚠️ **IMPORTANT:** Change all passwords after first login!
-
-## 🏗️ System Architecture
-
-### Tech Stack:
-- **Frontend:** React 19 + Tailwind CSS
-- **Backend:** Node.js + Express
-- **Database:** PostgreSQL 16
-- **Deployment:** Docker + Docker Compose
-- **Platform:** Ubuntu (containerized)
-
-### Database Tables (19 total):
-1. `users` - Staff accounts (master/admin/worker)
-2. `clients` - Customer accounts
-3. `laundry_orders` - Clothing cleaning orders
-4. `airbnb_orders` - Property cleaning orders
-5. `services` - Service catalog with pricing
-6. `order_items` - Line items for orders
-7. `order_status_history` - Track all status changes
-8. `cleaning_photos` - Photo verification
-9. `time_logs` - Worker time tracking
-10. `payments` - Financial transactions
-11. `tickets` - Issue reporting
-12. `session` - User sessions
-
-## 👥 User Roles & Permissions
-
-### 🔑 Master (Business Owner)
-- Full system access
-- Create/manage admins and workers
-- Full finance access
-- All client and order management
-
-### 👔 Admin (Manager)
-- Create/manage workers (NOT other admins)
-- Full client management
-- Full order management
-- Full finance access
-- Ticket management
-
-### 👷 Worker (Cleaner)
-- View assigned orders only
-- Upload cleaning photos
-- Track time worked
-- Create tickets for issues
-- **NO finance access**
-- **NO user/client management**
-
-### 👤 Client (Customer)
-- View own orders only
-- Change password
-- Read-only access
-
-## 💰 Service Catalog
-
-### Laundry Services:
-1. **Wash & Fold** - €8/kg (24h)
-2. **Dry Cleaning** - €12/item (48h)
-3. **Iron Only** - €3/item (12h)
-4. **Express Wash** - €15/kg (3h)
-5. **Delicate Care** - €10/kg (24h)
-
-### Airbnb Cleaning:
-1. **Studio Cleaning** - €45 (90min)
-2. **1-Bedroom Cleaning** - €65 (120min)
-3. **2-Bedroom Cleaning** - €85 (150min)
-4. **Deep Clean** - €120 (240min)
-5. **Check-Out Clean** - €75 (120min)
-6. **Linen Change** - €20 (30min)
-7. **Restocking** - €15 (20min)
-
-*All services can be customized via Admin panel*
-
-## 📱 Key Features
-
-### For Master/Admin:
-- Dashboard with revenue statistics
-- Client CRM (create, edit, delete)
-- Create orders with multiple services
-- Payment tracking
-- Worker performance monitoring
-- Ticket management
-
-### For Workers:
-- View assigned cleaning jobs
-- Upload before/after photos
-- Track work hours (start/stop timer)
-- Report issues via tickets
-- Update job status
-
-### For Clients:
-- View current orders
-- See order history
-- Track order status
-- View cleaning photos (for Airbnb)
-
-## 🛠️ Development
-
-### Run without Docker:
-
-**Backend:**
-```bash
-npm install
-npm run server
-```
-
-**Frontend:**
-```bash
-cd client
-npm install
-npm start
-```
-
-### Docker Commands:
-```bash
-# Start
-docker-compose up -d
-
-# Stop
-docker-compose down
-
-# View logs
-docker-compose logs -f
-
-# Rebuild
-docker-compose build --no-cache && docker-compose up -d
-```
-
-### Database Access:
-```bash
-# Connect to PostgreSQL
-docker exec -it lavandaria-db psql -U lavandaria -d lavandaria
-
-# Backup
-docker exec lavandaria-db pg_dump -U lavandaria lavandaria > backup.sql
-```
-
-## 📊 Business Processes
-
-### Laundry Order Flow:
-```
-Create Order → Receive Items → Process → Ready → Deliver → Complete
-```
-
-### Airbnb Cleaning Flow:
-```
-Schedule → Assign Worker → Worker Arrives → Clean → Upload Photos → Complete
-```
-
-### Payment Flow:
-```
-Service Completed → Invoice Generated → Payment Received → Mark as Paid
-```
-
-## 🎫 Ticket System
-
-Workers can create tickets when they encounter problems:
-
-**Example Tickets:**
-- "Missing cleaning supplies at property"
-- "Client not available for key pickup"
-- "Stain couldn't be removed"
-- "Property access code not working"
-
-**Ticket Priority Levels:**
-- Low, Medium, High, Urgent
-
-**Ticket Workflow:**
-- Worker creates ticket
-- Admin/Master reviews
-- Admin assigns to responsible person
-- Issue gets resolved
-- Ticket closed
-
-## 📈 Reports & Analytics
-
-### Dashboard Statistics:
-- Total clients
-- Total orders (laundry + Airbnb)
-- Total revenue
-- Pending payments
-- Recent orders
-
-### Future Enhancements:
-- Revenue by period
-- Worker performance metrics
-- Service popularity analysis
-- Client retention stats
-
-## 🔒 Security Features
-
-- Bcrypt password hashing
-- Session-based authentication
-- HTTP-only cookies
-- CORS protection
-- Helmet.js security headers
-- SQL injection prevention (parameterized queries)
-- Role-based access control
-
-## 📁 Project Structure
-
-```
-Lavandaria/
-├── client/                 # React frontend
-│   ├── src/
-│   │   ├── pages/         # Page components
-│   │   ├── components/    # Reusable components
-│   │   └── context/       # Auth context
-│   └── public/
-├── routes/                # Express API routes
-│   ├── auth.js
-│   ├── users.js
-│   ├── clients.js
-│   ├── laundry.js
-│   ├── airbnb.js
-│   ├── payments.js
-│   ├── tickets.js
-│   └── dashboard.js
-├── middleware/            # Permission middleware
-├── database/              # PostgreSQL schema
-├── uploads/               # Photo storage
-├── server.js              # Express server
-├── deploy.sh              # Deployment script
-└── docker-compose.yml     # Docker configuration
-```
-
-## 📝 Documentation
-
-- **[CLAUDE.md](CLAUDE.md)** - Complete technical documentation
-- **[ROLE_HIERARCHY_SUMMARY.md](ROLE_HIERARCHY_SUMMARY.md)** - User roles explained
-- **[BUSINESS_ANALYSIS.md](BUSINESS_ANALYSIS.md)** - Business features and roadmap
-
-## 🐛 Troubleshooting
-
-**Database won't start:**
-```bash
-docker-compose down -v
-./deploy.sh
-```
-
-**Port conflicts:**
-Edit `docker-compose.yml` ports section
-
-**Permission errors:**
-```bash
-chmod -R 755 uploads/
-```
-
-**React build issues:**
-```bash
-cd client
-rm -rf node_modules
-npm install
-```
-
-## 🎯 Next Steps After Deployment
-
-1. ✅ Deploy: Run `./deploy.sh`
-2. ✅ Login as master
-3. ✅ Change master password
-4. ✅ Create real admin users
-5. ✅ Create worker accounts for cleaners
-6. ✅ Add your clients
-7. ✅ Customize service prices
-8. ✅ Create your first order!
-
-## 🤝 Support
-
-For technical documentation, see [CLAUDE.md](CLAUDE.md)
-
-For business features, see [BUSINESS_ANALYSIS.md](BUSINESS_ANALYSIS.md)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node](https://img.shields.io/badge/node-18%2B-green.svg)
+![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)
 
 ---
 
-**Built with ❤️ for efficient laundry and cleaning business management**
+## Table of Contents
 
-Generated with Claude Code
+- [Quick Start](#quick-start)
+- [Project Overview](#project-overview)
+- [Documentation](#documentation)
+- [Tech Stack](#tech-stack)
+- [Running Tests](#running-tests)
+- [Deployment](#deployment)
+- [Glossary](#glossary)
+- [Contributing](#contributing)
+
+---
+
+## Quick Start
+
+### Prerequisites
+- Docker & Docker Compose installed
+- Node.js 18+ (for local development)
+- PostgreSQL 16 (containerized or local)
+
+### One-Command Deployment
+
+```bash
+./deploy.sh
+```
+
+**What it does:**
+- Creates `.env` from template with secure SESSION_SECRET
+- Builds Docker containers (db + app)
+- Runs database migrations
+- Starts services with health checks
+- Displays access URLs and credentials
+
+**Access URLs:**
+- Frontend: http://localhost:3000
+- API Docs: http://localhost:3000/api/docs
+- Database: localhost:5432
+
+**Default Credentials:**
+- Master: `master` / `master123`
+- Admin: `admin` / `admin123`
+- Worker: `worker1` / `worker123`
+- Client: `911111111` / `lavandaria2025`
+
+---
+
+## Project Overview
+
+Lavandaria manages two distinct service lines under a unified platform:
+
+### 1. Laundry Service
+Traditional clothing cleaning with:
+- **Order Tracking**: Received → In Progress → Ready → Collected
+- **Itemization**: Bulk weight (€/kg) or itemized service catalog
+- **Client Notifications**: SMS/email when order ready
+
+### 2. Property Cleaning Service
+Airbnb/house cleaning with:
+- **Photo Verification**: Before/after/detail photos with room tracking
+- **Time Tracking**: Worker clock-in/out with manual entry support
+- **Job Management**: Scheduled → In Progress → Completed
+
+### Role Hierarchy
+
+```
+Master (Owner) → Admin (Manager) → Worker (Field) → Client (Customer)
+```
+
+- **Master**: Full system access, can create admins
+- **Admin**: Manage workers/clients/orders, finance access
+- **Worker**: View assigned jobs, upload photos, track time (NO finance access)
+- **Client**: View own orders (read-only)
+
+---
+
+## Documentation
+
+All documentation lives in the [`docs/`](docs/) folder:
+
+| Document | Purpose | Update Frequency |
+|----------|---------|------------------|
+| [📐 architecture.md](docs/architecture.md) | System overview, database schema, workflows | On schema changes |
+| [📊 progress.md](docs/progress.md) | Daily progress log (Planned/Doing/Done) | Daily |
+| [💡 decisions.md](docs/decisions.md) | Implementation decisions with context | On major changes |
+| [🐛 bugs.md](docs/bugs.md) | Bug tracking and fixes | On discovery/resolution |
+| [🔒 security.md](docs/security.md) | Security posture, audits, open items | Quarterly |
+
+**Start Here:** [`docs/architecture.md`](docs/architecture.md) for system design and database schema.
+
+---
+
+## Tech Stack
+
+### Backend
+- **Runtime**: Node.js 18+ with Express.js 4.18
+- **Database**: PostgreSQL 16 (single source of truth)
+- **Authentication**: Session-based (PostgreSQL store, HTTP-only cookies)
+- **File Uploads**: Multer (10MB limit, batch uploads)
+- **Validation**: express-validator
+- **API Docs**: OpenAPI 3.0 (Swagger UI)
+
+### Frontend
+- **Framework**: React 19 with React Router 7
+- **Styling**: Tailwind CSS 3 (utility-first)
+- **State**: Context API (no Redux)
+- **HTTP Client**: Axios with credentials
+
+### DevOps
+- **Deployment**: Docker + Docker Compose
+- **Base Image**: Alpine Linux (minimal)
+- **Orchestration**: [`deploy.sh`](deploy.sh) (one-command)
+- **Health Checks**: `/api/healthz`, `/api/readyz`
+
+### Testing
+- **E2E**: Playwright (terminal-first, then UI)
+- **Frontend**: Jest + React Testing Library
+- **Manual**: cURL scripts with correlation IDs
+
+---
+
+## Running Tests
+
+### Recommended Workflow (Terminal-First)
+
+**1. Seed Test Data:**
+```bash
+npm run test:seed
+# Creates: master, admin, worker1, client with known passwords
+```
+
+**2. Run E2E Tests (Headless):**
+```bash
+npm run test:e2e
+# Runs all Playwright tests in terminal
+# Collects: screenshots, traces, HTML report
+```
+
+**3. View Results:**
+```bash
+npm run test:e2e:report
+# Opens HTML report in browser
+```
+
+**4. Debug Failures (Playwright UI):**
+```bash
+npm run test:e2e:ui
+# Opens Playwright UI for trace replay
+# Inspect network, console, screenshots
+```
+
+### Test Coverage
+
+| Test Suite | File | Scenarios |
+|------------|------|-----------|
+| Worker Photo Upload | `tests/e2e/worker-photo-upload.spec.js` | Batch uploads, RBAC, invalid files |
+| Client Photo Viewing | `tests/e2e/client-photo-viewing.spec.js` | Pagination, viewing tracking |
+| RBAC & Sessions | `tests/e2e/rbac-and-sessions.spec.js` | Finance restrictions, session persistence |
+
+### Frontend Tests
+```bash
+cd client
+npm test                    # Run Jest tests
+npm test -- --coverage      # With coverage report
+npm test -- --watchAll      # Watch mode
+```
+
+---
+
+## Deployment
+
+### Production Deployment (Docker)
+
+```bash
+./deploy.sh
+```
+
+See [`docs/architecture.md`](docs/architecture.md) for detailed deployment architecture.
+
+### Local Development (Without Docker)
+
+**Terminal 1 - Database:**
+```bash
+docker-compose up -d db
+```
+
+**Terminal 2 - Backend:**
+```bash
+npm install
+npm run server    # Nodemon auto-reload
+```
+
+**Terminal 3 - Frontend:**
+```bash
+cd client
+npm install
+npm start         # Runs on port 3001
+```
+
+**Access:**
+- Backend: http://localhost:3000
+- Frontend: http://localhost:3001 (proxies API to :3000)
+
+### Environment Variables
+
+Create `.env` from [`.env.example`](.env.example):
+
+```env
+# Required
+SESSION_SECRET=<32+ char hex string>   # Auto-generated by deploy.sh
+DB_HOST=db
+DB_USER=lavandaria
+DB_PASSWORD=lavandaria2025
+DB_NAME=lavandaria
+
+# Optional
+NODE_ENV=production
+PORT=3000
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+```
+
+---
+
+## Glossary
+
+### Business Terms
+
+**Order Lifecycle** (Laundry):
+- `received` - Order received from client
+- `in_progress` - Being processed by worker
+- `ready` - Ready for client pickup
+- `collected` - Client picked up order
+- `cancelled` - Order cancelled
+
+**Job Lifecycle** (Cleaning):
+- `scheduled` - Job scheduled with date/time
+- `in_progress` - Worker on-site, time tracking active
+- `completed` - Job finished, photos uploaded
+- `cancelled` - Job cancelled
+
+**Order Types** (Laundry):
+- `bulk_kg` - Charged by weight (€/kg)
+- `itemized` - Individual item pricing
+- `house_bundle` - Fixed-price package
+
+**Job Types** (Cleaning):
+- `airbnb` - Short-term rental property
+- `house` - Residential house
+
+**Photo Types**:
+- `before` - Before cleaning
+- `after` - After cleaning
+- `detail` - Detail shots (specific areas)
+
+**Payment Methods**:
+- `cash` - Cash payment
+- `card` - Credit/debit card
+- `transfer` - Bank transfer
+- `mbway` - Portuguese mobile payment
+- `other` - Other methods
+
+**Payment Status**:
+- `pending` - Not yet paid
+- `paid` - Fully paid
+- `partial` - Partially paid
+
+### Technical Terms
+
+**RBAC** - Role-Based Access Control (Master → Admin → Worker → Client)
+
+**Session Store** - PostgreSQL-backed sessions for persistence and horizontal scaling
+
+**Correlation ID** - Unique request identifier for tracing (`req_1729...`)
+
+**Photo Verification** - Multi-type photo upload with client viewing tracking
+
+**Batch Upload** - Maximum 10 files per upload request (unlimited total)
+
+**Middleware Stack** - Request processing order: Helmet → Morgan → CORS → Session → Auth
+
+**Response Envelope** - Standardized API response format with `_meta` object
+
+**Migration Dependencies** - Specific execution order: 000 → 002 → 001 → 003 → 004
+
+---
+
+## File Structure
+
+```
+Lavandaria/
+├── server.js                      # Main Express server
+├── deploy.sh                      # One-command deployment
+├── package.json                   # Root dependencies
+├── .env.example                   # Environment template
+├── docker-compose.yml             # Container orchestration
+├── Dockerfile                     # App container definition
+├── README.md                      # This file
+│
+├── config/
+│   └── database.js                # PostgreSQL connection pool
+│
+├── database/
+│   ├── init.sql                   # Schema definition
+│   └── migrations_archive/        # Migration history
+│       ├── 000_add_user_client_fields.sql
+│       ├── 002_create_jobs_system.sql
+│       ├── 001_standardize_address_fields.sql
+│       ├── 003_pricing_and_settings.sql
+│       └── 004_split_payments_tables.sql
+│
+├── middleware/
+│   ├── permissions.js             # RBAC middleware
+│   ├── validation.js              # Response helpers
+│   └── rateLimiter.js             # Rate limiting + correlation IDs
+│
+├── routes/
+│   ├── auth.js                    # Login/logout
+│   ├── users.js                   # Staff CRUD
+│   ├── clients.js                 # Client CRUD
+│   ├── cleaning-jobs.js           # Cleaning jobs + photos
+│   ├── laundry-orders.js          # Laundry orders
+│   ├── laundry-services.js        # Service catalog
+│   ├── payments.js                # Payment tracking
+│   ├── dashboard.js               # Dashboard data
+│   ├── tickets.js                 # Issue reporting
+│   ├── properties.js              # Client addresses
+│   ├── settings.js                # System settings
+│   └── health.js                  # Health checks
+│
+├── client/                        # React frontend
+│   ├── src/
+│   │   ├── App.js                 # Main React component
+│   │   ├── context/
+│   │   │   └── AuthContext.js     # Auth state management
+│   │   ├── pages/
+│   │   │   ├── Landing.js         # Dual login page
+│   │   │   ├── Dashboard.js       # Role router
+│   │   │   ├── AdminDashboard.js  # Admin UI
+│   │   │   ├── MasterDashboard.js # Master UI
+│   │   │   ├── WorkerDashboard.js # Worker UI
+│   │   │   └── ClientDashboard.js # Client UI
+│   │   └── components/            # Reusable components
+│   ├── public/                    # Static assets
+│   ├── tailwind.config.js         # Tailwind configuration
+│   └── package.json               # Frontend dependencies
+│
+├── tests/
+│   └── e2e/                       # Playwright E2E tests
+│       ├── worker-photo-upload.spec.js
+│       ├── client-photo-viewing.spec.js
+│       └── rbac-and-sessions.spec.js
+│
+├── uploads/
+│   └── cleaning_photos/           # Uploaded photos
+│
+├── logs/                          # Application logs
+│
+└── docs/                          # Living documentation
+    ├── architecture.md            # System design + schema
+    ├── progress.md                # Daily progress log
+    ├── decisions.md               # Implementation decisions
+    ├── bugs.md                    # Bug tracking
+    └── security.md                # Security posture
+```
+
+---
+
+## Contributing
+
+### Development Workflow
+
+1. **Create Feature Branch:**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Implement Changes:**
+   - Follow patterns in `docs/architecture.md`
+   - Add tests (E2E for user-facing features)
+   - Update `docs/decisions.md` for major decisions
+
+3. **Run Tests:**
+   ```bash
+   npm run test:seed      # Seed test data
+   npm run test:e2e       # Run E2E tests (terminal-first)
+   npm run test:e2e:ui    # Debug failures
+   ```
+
+4. **Commit with Convention:**
+   ```bash
+   git commit -m "feat(orders): add bulk order import"
+   git commit -m "fix(auth): resolve session persistence issue"
+   git commit -m "docs: update security checklist"
+   ```
+
+5. **Update Progress Log:**
+   - Add entry to `docs/progress.md`
+   - Record decision in `docs/decisions.md` if applicable
+
+6. **Create Pull Request:**
+   ```bash
+   git push -u origin feature/your-feature-name
+   gh pr create --title "feat: your feature" --body "Description..."
+   ```
+
+### Code Style Guidelines
+
+**Backend (Node.js):**
+- CommonJS modules (`require`, `module.exports`)
+- Parameterized queries (NEVER string concatenation)
+- Correlation IDs in all logs
+- Standard response envelope pattern
+- Try/catch with proper error codes
+
+**Frontend (React):**
+- ES6 modules (`import`, `export`)
+- Functional components with hooks
+- Tailwind utility classes (no custom CSS)
+- `axios.defaults.withCredentials = true`
+
+**Database:**
+- Explicit `ON DELETE` policies (CASCADE or SET NULL)
+- CHECK constraints for valid values
+- Indexes on foreign keys and status fields
+- Created timestamps (created_at, updated_at)
+
+**Testing:**
+- Terminal-first (headless)
+- Then Playwright UI for debugging
+- Test all RBAC scenarios
+- Verify correlation IDs in responses
+
+---
+
+## Useful Commands
+
+### Docker Operations
+```bash
+npm run docker:build      # Build containers
+npm run docker:up         # Start services
+npm run docker:down       # Stop services
+npm run docker:logs       # View logs
+```
+
+### Database Operations
+```bash
+# Connect to database
+docker exec -it lavandaria-db psql -U lavandaria -d lavandaria
+
+# Query sessions
+docker exec -it lavandaria-db psql -U lavandaria -d lavandaria -c "SELECT * FROM session;"
+
+# Backup database
+docker exec lavandaria-db pg_dump -U lavandaria lavandaria > backup.sql
+
+# Restore database
+cat backup.sql | docker exec -i lavandaria-db psql -U lavandaria lavandaria
+```
+
+### Development Shortcuts
+```bash
+npm run dev               # Run server + client concurrently
+npm run server            # Backend only (nodemon)
+npm run client            # Frontend only (port 3001)
+npm run build             # Production build
+npm start                 # Production server
+```
+
+---
+
+## License
+
+MIT License - See [LICENSE](LICENSE) file for details.
+
+---
+
+## Support & Contact
+
+- **Documentation**: [`docs/`](docs/)
+- **Bug Reports**: [`docs/bugs.md`](docs/bugs.md)
+- **Security Issues**: See [`docs/security.md`](docs/security.md)
+- **GitHub**: [HSousa1987/Lavandaria](https://github.com/HSousa1987/Lavandaria)
+
+---
+
+**Last Updated:** 2025-10-23
+**Version:** 1.0.0 (Post-Cutover)

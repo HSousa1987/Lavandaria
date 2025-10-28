@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const { pool } = require('../config/database');
 const { requireStaff, requireMasterOrAdmin } = require('../middleware/permissions');
-const { listResponse, validatePagination, errorResponse } = require('../middleware/validation');
+const { listResponse, validatePagination, errorResponse, successResponse } = require('../middleware/validation');
 
 // Configure multer for photo uploads
 const storage = multer.diskStorage({
@@ -115,9 +115,11 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // ==============================================
-// GET SINGLE CLEANING JOB WITH PHOTOS
+// GET SINGLE CLEANING JOB WITH PHOTOS (with pagination support)
 // ==============================================
 router.get('/:id', requireAuth, async (req, res) => {
+    console.log(`🔵 GET /api/cleaning-jobs/${req.params.id} [${req.correlationId}] - User: ${req.session.userType}`);
+
     try {
         const jobResult = await pool.query(
             `SELECT cj.*,
@@ -131,28 +133,41 @@ router.get('/:id', requireAuth, async (req, res) => {
         );
 
         if (jobResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Job not found' });
+            console.log(`❌ Job not found: ${req.params.id} [${req.correlationId}]`);
+            return errorResponse(res, 404, 'Job not found', 'JOB_NOT_FOUND', req);
         }
 
         const job = jobResult.rows[0];
 
         // Check permissions
         if (req.session.userType === 'worker' && job.assigned_worker_id !== req.session.userId) {
-            return res.status(403).json({ error: 'Not your assigned job' });
+            console.log(`🚫 Worker ${req.session.userId} attempted to access unassigned job ${req.params.id} [${req.correlationId}]`);
+            return errorResponse(res, 403, 'You can only view your assigned jobs', 'NOT_ASSIGNED', req);
         }
         if (req.session.userType === 'client' && job.client_id !== req.session.clientId) {
-            return res.status(403).json({ error: 'Not your job' });
+            console.log(`🚫 Client ${req.session.clientId} attempted to access another client's job ${req.params.id} [${req.correlationId}]`);
+            return errorResponse(res, 403, 'You can only view your own jobs', 'NOT_YOUR_JOB', req);
         }
 
-        // Get photos
-        const photosResult = await pool.query(
-            `SELECT p.*, u.full_name as uploaded_by_name
-             FROM cleaning_job_photos p
-             LEFT JOIN users u ON p.worker_id = u.id
-             WHERE p.cleaning_job_id = $1
-             ORDER BY p.uploaded_at DESC`,
-            [req.params.id]
-        );
+        // Get photos with pagination support for large sets
+        const photoLimit = parseInt(req.query.photoLimit) || 100; // Default 100 photos per request
+        const photoOffset = parseInt(req.query.photoOffset) || 0;
+
+        const [photosResult, photoCountResult] = await Promise.all([
+            pool.query(
+                `SELECT p.*, u.full_name as uploaded_by_name
+                 FROM cleaning_job_photos p
+                 LEFT JOIN users u ON p.worker_id = u.id
+                 WHERE p.cleaning_job_id = $1
+                 ORDER BY p.uploaded_at DESC
+                 LIMIT $2 OFFSET $3`,
+                [req.params.id, photoLimit, photoOffset]
+            ),
+            pool.query(
+                `SELECT COUNT(*) FROM cleaning_job_photos WHERE cleaning_job_id = $1`,
+                [req.params.id]
+            )
+        ]);
 
         // Get time logs
         const timeLogsResult = await pool.query(
@@ -176,16 +191,26 @@ router.get('/:id', requireAuth, async (req, res) => {
                 `UPDATE cleaning_jobs SET client_viewed_photos = TRUE WHERE id = $1`,
                 [req.params.id]
             );
+            console.log(`📸 Client viewed ${photosResult.rows.length} photos for job ${req.params.id} [${req.correlationId}]`);
         }
 
-        res.json({
+        const totalPhotos = parseInt(photoCountResult.rows[0].count);
+        console.log(`✅ Fetched job ${req.params.id} with ${photosResult.rows.length} of ${totalPhotos} photos [${req.correlationId}]`);
+
+        return successResponse(res, {
             job: job,
             photos: photosResult.rows,
-            timeLogs: timeLogsResult.rows
-        });
+            timeLogs: timeLogsResult.rows,
+            photosPagination: {
+                total: totalPhotos,
+                limit: photoLimit,
+                offset: photoOffset,
+                hasMore: (photoOffset + photoLimit) < totalPhotos
+            }
+        }, 200, req);
     } catch (error) {
-        console.error('Error fetching job:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error(`❌ Error fetching job [${req.correlationId}]:`, error.message);
+        return errorResponse(res, 500, 'Server error', 'SERVER_ERROR', req);
     }
 });
 
@@ -538,38 +563,78 @@ router.post('/:id/end', requireStaff, async (req, res) => {
 });
 
 // ==============================================
-// UPLOAD PHOTOS (Worker)
+// UPLOAD PHOTOS (Worker) - Batch upload up to 10 files
 // ==============================================
-router.post('/:id/photos', requireStaff, upload.single('photo'), async (req, res) => {
+router.post('/:id/photos', requireStaff, upload.array('photos', 10), async (req, res) => {
+    console.log(`📸 POST /api/cleaning-jobs/${req.params.id}/photos [${req.correlationId}] - User: ${req.session.userType}`);
+
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No photo uploaded' });
+        // Validate files were uploaded
+        if (!req.files || req.files.length === 0) {
+            console.log(`❌ No photos uploaded [${req.correlationId}]`);
+            return errorResponse(res, 400, 'No photos uploaded', 'NO_FILES', req);
+        }
+
+        // Enforce batch limit of 10 files per request
+        if (req.files.length > 10) {
+            console.log(`❌ Too many files in batch: ${req.files.length} [${req.correlationId}]`);
+            return errorResponse(res, 400, 'Maximum 10 photos per upload batch', 'BATCH_LIMIT_EXCEEDED', req);
+        }
+
+        // Verify job exists
+        const jobCheck = await pool.query(
+            'SELECT * FROM cleaning_jobs WHERE id = $1',
+            [req.params.id]
+        );
+
+        if (jobCheck.rows.length === 0) {
+            console.log(`❌ Job not found: ${req.params.id} [${req.correlationId}]`);
+            return errorResponse(res, 404, 'Job not found', 'JOB_NOT_FOUND', req);
+        }
+
+        const job = jobCheck.rows[0];
+
+        // Workers can only upload to their assigned jobs
+        if (req.session.userType === 'worker' && job.assigned_worker_id !== req.session.userId) {
+            console.log(`🚫 Worker ${req.session.userId} attempted to upload to unassigned job ${req.params.id} [${req.correlationId}]`);
+            return errorResponse(res, 403, 'You can only upload photos to your assigned jobs', 'NOT_ASSIGNED', req);
         }
 
         const { photo_type, room_area, caption } = req.body;
+        const uploadedPhotos = [];
 
-        const result = await pool.query(
-            `INSERT INTO cleaning_job_photos (
-                cleaning_job_id, worker_id, photo_url, photo_type,
-                room_area, caption, original_filename, file_size_kb
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING *`,
-            [
-                req.params.id,
-                req.session.userId,
-                '/uploads/cleaning_photos/' + req.file.filename,
-                photo_type || 'detail',
-                room_area,
-                caption,
-                req.file.originalname,
-                Math.round(req.file.size / 1024)
-            ]
-        );
+        // Insert each photo into database
+        for (const file of req.files) {
+            const result = await pool.query(
+                `INSERT INTO cleaning_job_photos (
+                    cleaning_job_id, worker_id, photo_url, photo_type,
+                    room_area, caption, original_filename, file_size_kb
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                RETURNING *`,
+                [
+                    req.params.id,
+                    req.session.userId,
+                    '/uploads/cleaning_photos/' + file.filename,
+                    photo_type || 'detail',
+                    room_area,
+                    caption,
+                    file.originalname,
+                    Math.round(file.size / 1024)
+                ]
+            );
+            uploadedPhotos.push(result.rows[0]);
+        }
 
-        res.status(201).json(result.rows[0]);
+        console.log(`✅ Uploaded ${uploadedPhotos.length} photos to job ${req.params.id} [${req.correlationId}]`);
+
+        return successResponse(res, {
+            photos: uploadedPhotos,
+            count: uploadedPhotos.length,
+            message: `Successfully uploaded ${uploadedPhotos.length} photo(s)`
+        }, 201, req);
     } catch (error) {
-        console.error('Error uploading photo:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error(`❌ Error uploading photos [${req.correlationId}]:`, error.message);
+        return errorResponse(res, 500, 'Photo upload failed', 'UPLOAD_ERROR', req);
     }
 });
 

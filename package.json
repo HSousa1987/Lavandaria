@@ -12,7 +12,16 @@
     "docker:build": "docker-compose build",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f"
+    "docker:logs": "docker-compose logs -f",
+    "test:preflight": "./scripts/preflight-health-check.sh",
+    "test:e2e": "./scripts/preflight-health-check.sh && playwright test",
+    "test:e2e:headless": "./scripts/preflight-health-check.sh && CI=true playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:no-preflight": "playwright test",
+    "test:seed": "node scripts/seed-test-data.js",
+    "test:prepare": "npm run test:seed && npm run test:e2e"
   },
   "keywords": [
     "laundry",
@@ -40,6 +49,7 @@
     "yamljs": "^0.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.40.0",
     "concurrently": "^8.2.2",
     "nodemon": "^3.0.2"
   }
