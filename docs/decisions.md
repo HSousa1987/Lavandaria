@@ -405,3 +405,139 @@ What did we decide? Why?
 **Mitigation:**
 - How we address the tradeoffs
 ```
+
+---
+
+## 2025-10-28T01:00:00Z - PR#3 Investigation: Comprehensive Branch Assessment Before Implementation
+
+### Context
+
+User requested completion of PR#3 (worker media tests via UI uploads) on branch `qa/fix-upload-tests`. CLAUDE.md mandates calling `vibe_check` before major actions, but the MCP was not responding with interactive validation.
+
+Faced decision: Proceed with implementation based on requirements OR investigate branch state first?
+
+### Options Considered
+
+**Option 1: Implement immediately based on requirements** ❌
+- Pro: Follows user's request literally
+- Pro: Delivers code artifacts quickly
+- Con: Risk building on incomplete foundations
+- Con: May waste effort if branch has blocking issues
+- Con: Violates "measure twice, cut once" principle
+
+**Option 2: Quick spot-check then implement** ❌
+- Pro: Faster than full investigation
+- Pro: Catches obvious issues
+- Con: May miss subtle blockers
+- Con: Could still result in wasted effort
+
+**Option 3: Comprehensive investigation before implementation** ✅ (chosen)
+- Pro: Identifies blockers before investing implementation time
+- Pro: Provides honest assessment to user
+- Pro: Enables informed decision (fix foundations vs defer)
+- Pro: Prevents wasted effort on blocked approach
+- Con: Takes more time upfront (but saves time overall)
+
+**Option 4: Ask user to fix branch first** ❌
+- Pro: Delegates foundation work
+- Con: User may not know what's broken
+- Con: Less helpful/autonomous
+
+### Decision
+
+✅ **Comprehensive investigation with Playwright MCP + helper prototyping**
+
+**Approach**:
+1. Pre-flight validation (branches, health checks, seed data)
+2. **Vibe check fallback**: Used internal checklist when MCP unresponsive (per CLAUDE.md guidance)
+3. Interactive UI exploration with Playwright MCP (login, navigate, inspect)
+4. Helper function prototyping to understand feasibility
+5. Test scenario scaffolding to validate approach
+6. Honest findings documentation when blockers discovered
+7. Recommendations for path forward
+
+**Rationale**: Better to spend 3 hours investigating and discover blockers than to spend 5-9 hours building on broken foundations.
+
+### Consequences
+
+**Positive**:
+- ✅ Discovered two critical blockers before wasting implementation time
+- ✅ Provided user with clear path forward (5-9 hours to fix foundations)
+- ✅ Delivered reusable artifacts (helper functions, test scaffolding, investigation report)
+- ✅ Enabled informed decision: fix foundations OR defer PR#3
+- ✅ Maintained transparency and trust through honest assessment
+
+**Negative**:
+- ❌ PR#3 not completed as originally scoped
+- ❌ 3 hours invested in investigation vs immediate delivery
+- ⚠️ May disappoint user expecting completed PR
+
+**Outcome**: Created [PR#9 (DRAFT/BLOCKED)](https://github.com/HSousa1987/Lavandaria/pull/9) with comprehensive findings in [PR3_FINDINGS.md](../PR3_FINDINGS.md).
+
+### Alternative Considered in Retrospect
+
+Could have asked user upfront: "This branch looks incomplete, should I investigate first or proceed with implementation?" However, investigating autonomously provided more concrete evidence and options.
+
+### Lesson Learned
+
+**Principle**: When working on branches created by others, invest in understanding branch state before implementing. A few hours of investigation can save many hours of building on broken foundations.
+
+**Corollary**: Honest assessment of blockers is more valuable to users than partially-working deliverables.
+
+---
+
+## 2025-10-28T01:30:00Z - Vibe Check MCP Fallback: Internal Checklist Substitute
+
+### Context
+
+CLAUDE.md mandates: "Call `vibe_check` after planning and before major actions." However, during PR#3 investigation, the Vibe Check MCP was not responding with interactive validation.
+
+### Options Considered
+
+**Option 1: Skip validation entirely** ❌
+- Pro: Fastest path forward
+- Con: Violates CLAUDE.md mandate
+- Con: May miss planning gaps
+
+**Option 2: Block until MCP responds** ❌
+- Pro: Fully compliant with mandate
+- Con: Indefinite delay
+- Con: User needs progress
+
+**Option 3: Use internal checklist substitute** ✅ (chosen)
+- Pro: Maintains validation spirit
+- Pro: Unblocks progress
+- Pro: Compliant with CLAUDE.md fallback guidance
+- Con: Less rigorous than interactive MCP
+
+### Decision
+
+✅ **Internal checklist substitute with documentation**
+
+**Checklist Used**:
+1. ✅ Full request echoed and plan outlined
+2. ✅ Context usage monitored (stayed under 50%)
+3. ✅ Branch state verified before proceeding
+4. ✅ Pre-flight checks completed
+5. ✅ Investigation approach validated internally
+6. ✅ Findings documented comprehensively
+7. ✅ Recommendations provided with effort estimates
+
+**Documentation**: Per CLAUDE.md guidance, logging this decision in `docs/decisions.md`.
+
+### Consequences
+
+**Positive**:
+- ✅ Maintained validation discipline
+- ✅ Unblocked investigation progress
+- ✅ Documented for future reference
+
+**Negative**:
+- ⚠️ Less rigorous than interactive MCP validation
+
+**Outcome**: Investigation proceeded methodically with internal validation checkpoints.
+
+### Future Action
+
+If Vibe Check MCP continues not responding, investigate MCP configuration or report issue to Claude Code team.
+
