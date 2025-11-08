@@ -26,20 +26,36 @@ const Landing = () => {
     setError('');
     setLoading(true);
 
+    window.LANDING_DEBUG = window.LANDING_DEBUG || {};
+    window.LANDING_DEBUG.handleSubmitCalled = true;
+
+    console.log('🔐 [Landing] handleSubmit called');
+    console.log('  - activeTab:', activeTab);
+
     try {
       const isClient = activeTab === 'client';
       const credentials = isClient
         ? { phone: formData.phone, password: formData.password }
         : { username: formData.username, password: formData.password };
 
+      console.log('🔐 [Landing] About to call login() with credentials');
       const response = await login(credentials, isClient);
+      window.LANDING_DEBUG.loginReturned = true;
+      window.LANDING_DEBUG.loginResponse = response;
+      console.log('🔐 [Landing] login() returned response:', response);
 
       if (response.client && response.client.mustChangePassword) {
+        console.log('🔐 [Landing] Redirecting to /change-password (mustChangePassword)');
+        window.LANDING_DEBUG.navigateToCPW = true;
         navigate('/change-password');
       } else {
+        console.log('🔐 [Landing] Redirecting to /dashboard');
+        window.LANDING_DEBUG.navigateToDashboard = true;
         navigate('/dashboard');
       }
     } catch (err) {
+      window.LANDING_DEBUG.loginError = err;
+      console.error('🔐 [Landing] Login error:', err);
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
@@ -116,7 +132,7 @@ const Landing = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form className="space-y-5">
               {error && (
                 <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded-lg text-sm">
                   {error}
@@ -192,7 +208,8 @@ const Landing = () => {
               </div>
 
               <button
-                type="submit"
+                type="button"
+                onClick={handleSubmit}
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3.5 rounded-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
               >
