@@ -6,6 +6,61 @@ This log records significant implementation decisions with context, options cons
 
 ---
 
+## 2025-11-08T04:05:00Z - Docker Container Cache Invalidation Strategy
+
+### Context
+Health endpoint tests were failing with unexpected response format:
+- Tests expected: `{success: true, data: {status, service}, _meta: {correlationId}}`
+- Container returned: `{status, service, timestamp, uptime}` (flat format, no envelope)
+- Local code review showed routes/health.js had correct envelope format
+- Discrepancy indicated Docker image cached old code version
+
+### Options Considered
+
+**Option 1: Simple rebuild** (`docker-compose build app`)
+- Pro: Minimal command
+- Con: Docker layer caching might still use old file if it hasn't changed in Dockerfile
+- Risk: Could silently use old code without warning
+
+**Option 2: Clean rebuild with `--no-cache`** (`docker-compose build --no-cache app`) ✅
+- Pro: Forces rebuild of all layers, guarantees fresh code
+- Pro: Clear audit trail that cache was invalidated
+- Con: Slower rebuild time (~15 seconds extra)
+- Con: Rebuilds even unchanged layers (resource waste in frequent iterative development)
+
+**Option 3: Multi-step nuclear option** (`docker image rm`, then rebuild)
+- Pro: Completely removes old image, forces fresh from scratch
+- Con: Slowest option (rebuild entire image layers)
+- Con: Overkill for single file change
+
+### Decision
+✅ **Option 2: `docker-compose build --no-cache` followed by `down`/`up`**
+
+Rationale:
+- Guarantees cache invalidation without over-engineering
+- Clear, explicit, and documented
+- Provides safety margin for production deployments
+- Faster than full image removal/rebuild
+- Standard Docker best practice for CI/CD pipelines
+
+### Consequences
+**Positive:**
+- ✅ Tests now pass with correct envelope format
+- ✅ API responses validated manually (curl)
+- ✅ Health endpoints tested: `/api/healthz` and `/api/readyz` both return `{success, data, _meta}`
+- ✅ Correlation IDs properly included for tracing
+
+**Negative:**
+- Extra ~15 seconds rebuild time (acceptable trade-off)
+- None significant
+
+**Follow-up:**
+- Document in team runbook: Always use `--no-cache` when code is updated outside Dockerfile
+- Consider adding file hash verification to Dockerfile for reproducible builds
+- In CI/CD, always use `--no-cache` to prevent environment-specific issues
+
+---
+
 ## 2025-11-08T03:45:00Z - Preflight Script Health Response Format Compatibility
 
 ### Context

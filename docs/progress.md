@@ -11,13 +11,27 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
 - [x] Validate no regressions (maintain ≥87.2% E2E pass rate)
 - [x] Create clean baseline (v1.2.0-baseline tag)
 - [x] Update preflight script for new health response format
+- [x] Fix health endpoint response format (WO-20251108-fix-rbac-test-failures)
 - [ ] Create delivery record for WO-20251108-pr-merge-audit
 - [ ] Execute WO-20251030-worker-ui-photo-consolidation
 
 ### Doing
-- Updating documentation for PR merge work order completion
+- Completing documentation updates for health endpoint fix
 
 ### Done
+- ✅ **Health Endpoint Response Format Fix** ([WO-20251108-fix-rbac-test-failures](../handoff/WO-20251108-fix-rbac-test-failures.md)):
+  - **Root Cause**: Docker cached old version of routes/health.js (flat format)
+  - **Fix Applied**:
+    - Updated routes/health.js to return standardized envelope `{success, data, _meta}`
+    - Rebuilt Docker image with `--no-cache` flag
+    - Restarted containers
+  - **Test Results**:
+    - ✅ Health endpoint tests passing (2/2)
+    - ✅ Readiness endpoint tests passing (1/1)
+    - API responses verified manually: correct envelope format with correlationId
+  - **Test Credentials**: Verified `worker1` already in use (no change needed)
+  - **Session/Logout**: Verified endpoints return correct JSON with `data.loggedOut` field
+
 - ✅ **PR Merge Audit Complete** ([WO-20251108-pr-merge-audit](../handoff/WO-20251108-pr-merge-audit.md)):
   - **PRs Merged**: #1 (tab nav), #2 (docs purge), #3 (docs bootstrap), #4 (login visibility), #5 (E2E auth), #6 (deterministic seed), #7 (photo endpoints), #8 (session/RBAC), #10 (session persist)
   - **Sequence**: Foundation → Infrastructure → UI Fixes → Features
@@ -38,7 +52,7 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
 - ✅ **Baseline Tagged**: `v1.2.0-baseline` created and pushed to GitHub
 
 ### Blockers
-- None - clean baseline established for new development
+- None - health endpoint fix complete, ready for PR
 
 ---
 

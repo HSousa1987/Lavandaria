@@ -6,6 +6,40 @@ This log tracks bugs discovered, their root causes, fixes applied, and tests add
 
 ---
 
+## Resolved Bugs
+
+### 2025-11-08 - Health Endpoint Response Format Mismatch (P2 - Test Configuration)
+
+**Evidence:**
+- RBAC test suite: 2/12 tests failing for health endpoints
+- Tests expect envelope format: `{success: true, data: {status, service}, _meta: {correlationId}}`
+- Docker container returning flat format: `{status, service, timestamp, uptime}`
+- Root cause identified: Dockerfile cached old version of routes/health.js
+
+**Root Cause:**
+- Local routes/health.js had correct envelope format (`{success, data, _meta}`)
+- Docker container image built with stale routes/health.js from earlier commit
+- Tests pass locally with updated code, fail in containerized environment
+
+**Fix Summary:**
+- Updated routes/health.js to return standardized envelope format on both endpoints
+- Rebuilt Docker image with `docker-compose build --no-cache app`
+- Restarted containers to load new code
+- Both /api/healthz and /api/readyz now return: `{success, data: {...}, _meta: {correlationId, timestamp}}`
+
+**Tests Added:**
+- Tests already present (rbac-and-sessions.spec.js lines 291-324)
+- Now passing: "health endpoint returns 200" ✓ and "readiness endpoint returns database status" ✓
+
+**Security Verified:**
+- ✅ No security vulnerabilities in health responses
+- ✅ Correlation IDs properly included for tracing
+- ✅ No authentication required (as intended for Kubernetes probes)
+
+**PR:** [PR #11 - fix(health): standardize response envelope format](link-to-pr)
+
+---
+
 ## Active Bugs
 
 ### 2025-10-26 - Playwright Request API Does Not Support Multiple File Uploads (P2)
