@@ -1,0 +1,179 @@
+# Implementation Decisions
+
+This log records significant implementation decisions with context, options considered, and consequences.
+
+**Format:** Timestamp | Context | Options | Decision | Consequences
+
+---
+
+## 2025-10-23T01:45:00Z - Documentation Architecture Bootstrap
+
+### Context
+After purging 41 legacy Markdown files (PR #2), needed to establish a canonical documentation structure that:
+- Serves as single source of truth
+- Grows with the project (living docs)
+- Supports multiple audiences (developers, operators, business)
+- Integrates with development workflow
+
+### Options Considered
+
+**Option 1: Flat README-only approach**
+- Pro: Simple, single file
+- Con: Becomes unwieldy (old CLAUDE.md was 1,110 lines)
+- Con: No separation of concerns
+
+**Option 2: Wiki-based documentation**
+- Pro: Easy to edit via GitHub UI
+- Con: Disconnected from code
+- Con: Not version-controlled with codebase
+
+**Option 3: Docs folder with living documents** ✅
+- Pro: Version-controlled with code
+- Pro: Separation of concerns (architecture, progress, bugs, security)
+- Pro: Append-only logs (progress, decisions) grow over time
+- Pro: Reference docs (architecture, security) updated as system evolves
+
+### Decision
+Implemented **Option 3**: `docs/` folder with 5 living documents:
+
+1. **docs/architecture.md** - System overview, schema, workflows
+2. **docs/progress.md** - Daily progress log (append-only)
+3. **docs/decisions.md** - Implementation decisions (append-only, this file)
+4. **docs/bugs.md** - Bug tracking and fixes
+5. **docs/security.md** - Security posture and checklist
+
+Plus **README.md** as entry point with glossary and navigation.
+
+### Consequences
+
+**Positive:**
+- Clear information architecture
+- Living documents evolve with project
+- Easy to find information (navigation via README)
+- Decision history preserved (this file)
+- Progress tracking visible (daily entries)
+
+**Negative:**
+- Requires discipline to maintain
+- Multiple files to update (vs. single README)
+
+**Mitigation:**
+- Mandatory updates: Add progress entry daily, record decisions before major changes
+- Auto-update in workflows: PRs update progress.md automatically
+
+---
+
+## 2025-10-23T02:00:00Z - MCP Tool Integration for Documentation
+
+### Context
+Bootstrap documentation needed:
+- Accurate database schema snapshot
+- Validated domain terminology
+- Prevent documentation drift from implementation
+
+### Options Considered
+
+**Option 1: Manual schema documentation**
+- Pro: Full control over format
+- Con: Error-prone, tedious
+- Con: Immediate drift from actual schema
+
+**Option 2: Auto-generate from schema dumps**
+- Pro: Accurate at snapshot time
+- Con: Requires parsing SQL dumps
+- Con: No semantic understanding
+
+**Option 3: Use PostgreSQL-RO MCP + Context7 MCP** ✅
+- Pro: Live schema query (always accurate)
+- Pro: Context7 validates terminology
+- Pro: Discovers existing documentation (found 494 snippets)
+
+### Decision
+Used **MCP tools** to auto-populate documentation:
+
+**PostgreSQL-RO MCP:**
+- Queried live schema for 15 tables
+- Extracted columns, constraints, indexes
+- Generated data model snapshot in architecture.md
+
+**Context7 MCP:**
+- Validated laundry order lifecycle terminology
+- Validated cleaning job lifecycle terminology
+- Validated photo verification patterns
+- Discovered project docs at `/hsousa1987/lavandaria`
+
+### Consequences
+
+**Positive:**
+- Accurate schema snapshot at 2025-10-23
+- Validated terminology prevents ambiguity
+- Found 494 code snippets in project index
+- Living document can be regenerated
+
+**Negative:**
+- Requires MCP servers configured
+- Connection string needed for postgres-ro (not auto-configured)
+
+**Mitigation:**
+- Document MCP setup in README
+- Include schema refresh command for future updates
+
+---
+
+## 2025-10-08 - Split Payment Tables (Historical)
+
+### Context
+Original `payments` table used polymorphic foreign keys (job_id OR order_id), allowing NULL values and violating referential integrity.
+
+### Decision
+Split into two tables:
+- `payments_cleaning` → FK to `cleaning_jobs.id`
+- `payments_laundry` → FK to `laundry_orders_new.id`
+
+### Consequences
+- ✅ Clean referential integrity (no NULL FKs)
+- ✅ Simplified queries (no COALESCE)
+- ⚠️ Two tables to manage instead of one
+
+**Reference:** Migration 004_split_payments_tables.sql
+
+---
+
+## Template for Future Decisions
+
+```markdown
+## YYYY-MM-DDTHH:MM:SSZ - Decision Title
+
+### Context
+What problem were we solving? What constraints existed?
+
+### Options Considered
+
+**Option 1: Description**
+- Pro: Advantage
+- Con: Disadvantage
+
+**Option 2: Description**
+- Pro: Advantage
+- Con: Disadvantage
+
+**Option 3: Chosen** ✅
+- Pro: Advantage
+- Pro: Advantage
+
+### Decision
+What did we decide? Why?
+
+### Consequences
+
+**Positive:**
+- Benefit 1
+- Benefit 2
+
+**Negative:**
+- Tradeoff 1
+- Tradeoff 2
+
+**Mitigation:**
+- How we address the tradeoffs
+```
