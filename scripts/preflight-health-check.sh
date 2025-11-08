@@ -122,11 +122,17 @@ HTTP_CODE=$(echo "$RESPONSE" | tail -1)
 BODY=$(echo "$RESPONSE" | sed '$d')
 CORRELATION_ID=$(echo "$BODY" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('_meta', {}).get('correlationId', ''))" 2>/dev/null || echo "")
 DB_STATUS=$(echo "$BODY" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('data', {}).get('checks', {}).get('database', {}).get('status', ''))" 2>/dev/null || echo "")
+DB_CONNECTED=$(echo "$BODY" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('database', {}).get('connected', ''))" 2>/dev/null || echo "")
 DURATION_MS=$(( ($(date +%s) - START_S) * 1000 ))
 
-if [[ "$HTTP_CODE" == "200" ]] && [[ "$DB_STATUS" == "ok" ]]; then
+# Support both old format (data.checks.database.status) and new format (database.connected)
+if [[ "$HTTP_CODE" == "200" ]] && ( [[ "$DB_STATUS" == "ok" ]] || [[ "$DB_CONNECTED" == "True" ]] ); then
     echo -e "   ${GREEN}✓${NC} Readiness endpoint returned 200 OK (${DURATION_MS}ms)"
-    echo -e "   ${GREEN}✓${NC} Database status: $DB_STATUS"
+    if [[ -n "$DB_STATUS" ]]; then
+        echo -e "   ${GREEN}✓${NC} Database status: $DB_STATUS"
+    else
+        echo -e "   ${GREEN}✓${NC} Database connected: $DB_CONNECTED"
+    fi
     if [[ -n "$CORRELATION_ID" ]]; then
         echo -e "   ${GREEN}✓${NC} Correlation ID: $CORRELATION_ID"
     fi
