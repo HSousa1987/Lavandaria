@@ -121,7 +121,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" -H "Accept: application/json" "$APP_URL/a
 HTTP_CODE=$(echo "$RESPONSE" | tail -1)
 BODY=$(echo "$RESPONSE" | sed '$d')
 CORRELATION_ID=$(echo "$BODY" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('_meta', {}).get('correlationId', ''))" 2>/dev/null || echo "")
-DB_STATUS=$(echo "$BODY" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('checks', {}).get('database', {}).get('status', ''))" 2>/dev/null || echo "")
+DB_STATUS=$(echo "$BODY" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('data', {}).get('checks', {}).get('database', {}).get('status', ''))" 2>/dev/null || echo "")
 DURATION_MS=$(( ($(date +%s) - START_S) * 1000 ))
 
 if [[ "$HTTP_CODE" == "200" ]] && [[ "$DB_STATUS" == "ok" ]]; then

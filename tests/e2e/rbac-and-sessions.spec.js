@@ -33,7 +33,7 @@ const STAFF_ROUTES = [
 ];
 
 test.describe('RBAC - Finance Access Restrictions', () => {
-    test('worker cannot access finance routes', async ({ page, request }) => {
+    test('worker cannot access finance routes', async ({ page }) => {
         // Login as worker
         await page.goto('/');
         // Login form is visible by default - select Staff tab
@@ -46,7 +46,7 @@ test.describe('RBAC - Finance Access Restrictions', () => {
 
         // Test each finance route
         for (const route of FINANCE_ROUTES) {
-            const response = await request.get(route);
+            const response = await page.request.get(route);
 
             expect(response.status()).toBe(403);
             const result = await response.json();
@@ -60,7 +60,7 @@ test.describe('RBAC - Finance Access Restrictions', () => {
         }
     });
 
-    test('admin can access finance routes', async ({ page, request }) => {
+    test('admin can access finance routes', async ({ page }) => {
         // Login as admin
         await page.goto('/');
         // Login form is visible by default - select Staff tab
@@ -72,13 +72,13 @@ test.describe('RBAC - Finance Access Restrictions', () => {
         await page.waitForURL('/dashboard', { timeout: 10000 });
 
         // Test dashboard route (admin should have access)
-        const response = await request.get('/api/dashboard');
+        const response = await page.request.get('/api/dashboard');
 
         // Should succeed (200) or return data (not 403)
         expect(response.status()).not.toBe(403);
     });
 
-    test('master can access all routes', async ({ page, request }) => {
+    test('master can access all routes', async ({ page }) => {
         // Login as master
         await page.goto('/');
         // Login form is visible by default - select Staff tab
@@ -91,7 +91,7 @@ test.describe('RBAC - Finance Access Restrictions', () => {
 
         // Master should have access to all routes
         for (const route of FINANCE_ROUTES) {
-            const response = await request.get(route);
+            const response = await page.request.get(route);
             expect(response.status()).not.toBe(403);
         }
     });
@@ -178,7 +178,7 @@ test.describe('Session Behavior', () => {
         expect(response2.ok()).toBeTruthy();
     });
 
-    test('session check endpoint returns user info', async ({ page, request }) => {
+    test('session check endpoint returns user info', async ({ page }) => {
         // Login as admin
         await page.goto('/');
         // Login form is visible by default - select Staff tab
@@ -189,17 +189,21 @@ test.describe('Session Behavior', () => {
         // All users navigate to /dashboard after login
         await page.waitForURL('/dashboard', { timeout: 10000 });
 
-        // Check session endpoint
-        const response = await request.get('/api/auth/check');
+        // Check session endpoint (with standardized envelope)
+        const response = await page.request.get('/api/auth/session');
         expect(response.ok()).toBeTruthy();
 
         const result = await response.json();
-        expect(result).toHaveProperty('user');
-        expect(result.user).toHaveProperty('username', CREDENTIALS.admin.username);
-        expect(result.user).toHaveProperty('userType', 'admin');
+        expect(result).toHaveProperty('success', true);
+        expect(result).toHaveProperty('data');
+        expect(result.data).toHaveProperty('authenticated', true);
+        expect(result.data).toHaveProperty('role', 'admin');
+        expect(result.data).toHaveProperty('principal');
+        expect(result._meta).toBeDefined();
+        expect(result._meta.correlationId).toBeDefined();
     });
 
-    test('logout clears session and denies access', async ({ page, request }) => {
+    test('logout clears session and denies access', async ({ page }) => {
         // Login
         await page.goto('/');
         // Login form is visible by default - select Staff tab
@@ -211,15 +215,21 @@ test.describe('Session Behavior', () => {
         await page.waitForURL('/dashboard', { timeout: 10000 });
 
         // Verify authenticated
-        const beforeLogout = await request.get('/api/cleaning-jobs');
+        const beforeLogout = await page.request.get('/api/cleaning-jobs');
         expect(beforeLogout.ok()).toBeTruthy();
 
-        // Logout
-        const logoutResponse = await request.post('/api/auth/logout');
+        // Logout (with standardized envelope)
+        const logoutResponse = await page.request.post('/api/auth/logout');
         expect(logoutResponse.ok()).toBeTruthy();
 
+        const logoutResult = await logoutResponse.json();
+        expect(logoutResult).toHaveProperty('success', true);
+        expect(logoutResult.data).toHaveProperty('loggedOut', true);
+        expect(logoutResult._meta).toBeDefined();
+        expect(logoutResult._meta.correlationId).toBeDefined();
+
         // Verify session cleared
-        const afterLogout = await request.get('/api/cleaning-jobs');
+        const afterLogout = await page.request.get('/api/cleaning-jobs');
         expect(afterLogout.status()).toBe(401);
     });
 
@@ -284,8 +294,14 @@ test.describe('Health and Readiness Endpoints', () => {
         expect(response.ok()).toBeTruthy();
         const result = await response.json();
 
-        expect(result).toHaveProperty('status', 'healthy');
-        expect(result).toHaveProperty('timestamp');
+        // Standardized envelope format
+        expect(result).toHaveProperty('success', true);
+        expect(result).toHaveProperty('data');
+        expect(result.data).toHaveProperty('status', 'ok');
+        expect(result.data).toHaveProperty('service', 'lavandaria-api');
+        expect(result._meta).toBeDefined();
+        expect(result._meta.correlationId).toBeDefined();
+        expect(result._meta.timestamp).toBeDefined();
     });
 
     test('readiness endpoint returns database status', async ({ request }) => {
@@ -294,14 +310,17 @@ test.describe('Health and Readiness Endpoints', () => {
         expect(response.ok()).toBeTruthy();
         const result = await response.json();
 
-        expect(result).toHaveProperty('status');
-        expect(result).toHaveProperty('database');
-        expect(result.database).toHaveProperty('connected');
-
-        if (result.database.connected) {
-            expect(result.database).toHaveProperty('latency');
-            expect(typeof result.database.latency).toBe('number');
-        }
+        // Standardized envelope format
+        expect(result).toHaveProperty('success', true);
+        expect(result).toHaveProperty('data');
+        expect(result.data).toHaveProperty('status', 'ready');
+        expect(result.data).toHaveProperty('checks');
+        expect(result.data.checks).toHaveProperty('database');
+        expect(result.data.checks.database).toHaveProperty('status', 'ok');
+        expect(result.data.checks.database).toHaveProperty('latency_ms');
+        expect(typeof result.data.checks.database.latency_ms).toBe('number');
+        expect(result._meta).toBeDefined();
+        expect(result._meta.correlationId).toBeDefined();
     });
 
     test('health and readiness are public (no auth required)', async ({ browser }) => {

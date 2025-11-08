@@ -1,0 +1,30 @@
+{
+  "timestamp": "2025-10-27T21:18:24+00:00",
+  "appUrl": "http://localhost:3000",
+  "checks": [
+    {
+      "name": "root_page",
+      "status": "PASS",
+      "httpCode": 200,
+      "correlationId": null,
+      "durationMs": 0,
+      "message": "HTML page served successfully"
+    },
+    {
+      "name": "health_endpoint",
+      "status": "PASS",
+      "httpCode": 200,
+      "correlationId": "req_1761599904593_ss6lc339d",
+      "durationMs": 0,
+      "message": "Liveness check passed"
+    },
+    {
+      "name": "readiness_endpoint",
+      "status": "PASS",
+      "httpCode": 200,
+      "correlationId": "req_1761599904730_za5cox2p3",
+      "durationMs": 0,
+      "message": "Readiness check passed, DB healthy"
+    }
+  ]
+}

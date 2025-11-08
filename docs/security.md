@@ -46,6 +46,12 @@ This document outlines the security posture, implemented controls, open items, a
 - Middleware enforcement (`requireAuth`, `requireMaster`, `requireFinanceAccess`, etc.)
 - Query-level filtering (workers see only assigned jobs)
 - Finance routes blocked for workers
+- **Authentication-before-authorization flow** (2025-10-27):
+  - All permission middleware check authentication (401) before authorization (403)
+  - Proper HTTP semantics: 401 = "need to authenticate", 403 = "authenticated but forbidden"
+  - Standardized error codes: `UNAUTHENTICATED`, `FINANCE_ACCESS_DENIED`, `ADMIN_ACCESS_REQUIRED`, `STAFF_ACCESS_REQUIRED`
+  - Session endpoint returns 401 (not 200) when unauthenticated
+  - Logout explicitly clears session cookie with `res.clearCookie('connect.sid')`
 
 #### Input Validation & Injection Prevention
 

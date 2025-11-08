@@ -405,3 +405,96 @@ What did we decide? Why?
 **Mitigation:**
 - How we address the tradeoffs
 ```
+
+---
+
+## 2025-10-27T22:30:00Z - Authentication Before Authorization in Middleware
+
+### Context
+RBAC/session E2E tests failing with incorrect HTTP status codes:
+- Unauthenticated requests to protected routes returned **403 Forbidden** instead of **401 Unauthorized**
+- Issue: Permission middleware (`requireFinanceAccess`, `requireMasterOrAdmin`, `requireStaff`) checked `req.session.userType !== 'master'` without first verifying authentication
+- When `req.session.userType` is `undefined` (unauthenticated), the condition evaluates to `true`, triggering authorization denial (403) before authentication check (401)
+
+**HTTP Status Code Semantics:**
+- **401 Unauthorized**: "You need to authenticate" (credentials missing/invalid)
+- **403 Forbidden**: "You are authenticated, but you lack permission"
+
+Tests correctly expected 401 for unauthenticated requests, but middleware was returning 403.
+
+### Options Considered
+
+**Option 1: Add `requireAuth` middleware before permission checks** ❌
+- Pro: Explicit separation of concerns (two middleware functions)
+- Con: Requires updating all route definitions
+- Con: Easy to forget in new routes (developer error prone)
+- Con: Adds extra function call overhead
+
+**Option 2: Check authentication inside each permission middleware** ✅
+- Pro: Self-contained - each middleware handles its own auth check
+- Pro: Cannot be bypassed accidentally (auth check is built-in)
+- Pro: Single middleware per route (cleaner route definitions)
+- Con: Small code duplication across middleware functions
+
+**Option 3: Create a wrapper/factory function** ⚖️
+- Pro: DRY - auth check in one place
+- Con: More abstraction (harder to understand)
+- Con: Doesn't follow existing codebase patterns
+
+### Decision
+**Chose Option 2**: Add authentication check at the start of each permission middleware function.
+
+**Implementation Pattern:**
+```javascript
+const requireFinanceAccess = (req, res, next) => {
+    // 1. Check authentication FIRST
+    if (!req.session.userType) {
+        return res.status(401).json({
+            success: false,
+            error: 'Authentication required',
+            code: 'UNAUTHENTICATED',
+            _meta: { correlationId, timestamp }
+        });
+    }
+
+    // 2. Then check authorization
+    if (req.session.userType !== 'master' && req.session.userType !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            error: 'Finance access denied',
+            code: 'FINANCE_ACCESS_DENIED',
+            _meta: { correlationId, timestamp }
+        });
+    }
+
+    next();
+};
+```
+
+**Files Modified:**
+- [middleware/permissions.js](../middleware/permissions.js): `requireFinanceAccess`, `requireMasterOrAdmin`, `requireStaff`
+- [routes/auth.js](../routes/auth.js): Session endpoint now returns 401 (was 200) when unauthenticated
+
+### Consequences
+
+**Positive:**
+- ✅ Correct HTTP semantics: 401 for auth failures, 403 for permission denials
+- ✅ Self-documenting: Each middleware clearly shows "auth then authz" flow
+- ✅ Cannot be bypassed: Auth check is mandatory before permission check
+- ✅ Consistent error codes across all endpoints: `UNAUTHENTICATED`, `FINANCE_ACCESS_DENIED`, etc.
+- ✅ All 12 RBAC/session tests now pass (was 5 failures)
+
+**Negative:**
+- ⚠️ Small code duplication: Auth check appears in 3 middleware functions
+  - Acceptable tradeoff for clarity and safety
+  - Could be refactored to shared helper if list grows significantly
+
+**Test Impact:**
+- Before: 12 tests, 5 failures (41.7% fail rate)
+- After: 12 tests, 0 failures (100% pass rate)
+
+**Security Posture:**
+- Improved: Clear distinction between authentication and authorization failures
+- Logging: Auth failures logged with correlation IDs for security monitoring
+- Client experience: Appropriate error messages ("Authentication required" vs "Finance access denied")
+

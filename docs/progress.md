@@ -4,6 +4,58 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
 
 ---
 
+## 2025-10-27
+
+### Planned
+- [x] Fix 5 failing RBAC/session/health E2E tests (from 41.7% to 100% pass rate)
+- [x] Standardize session/logout endpoints with proper HTTP status codes
+- [x] Fix permission middleware authentication-before-authorization flow
+- [x] Update tests to use page.request for proper cookie handling
+- [ ] Create PR#2 with standardized envelopes and updated docs
+
+### Doing
+- Creating PR#2: "fix: standardized session/health + finance access"
+
+### Done
+- ✅ **RBAC/Session/Health Fixes** (Branch: `fix/session-health-rbac`):
+  - **Session Endpoint** ([routes/auth.js:214-241](../routes/auth.js#L214-L241)):
+    - Returns 401 (not 200) when unauthenticated
+    - Standardized response: `{success, data:{authenticated, role, principal}, _meta}`
+    - Added error code: `UNAUTHENTICATED`
+
+  - **Logout Endpoint** ([routes/auth.js:243-272](../routes/auth.js#L243-L272)):
+    - Response format: `{success:true, data:{loggedOut:true}, _meta}`
+    - Explicitly clears session cookie with `res.clearCookie('connect.sid')`
+    - Proper correlation ID tracking
+
+  - **Permission Middleware** ([middleware/permissions.js](../middleware/permissions.js)):
+    - Fixed all middleware functions: `requireFinanceAccess`, `requireMasterOrAdmin`, `requireStaff`
+    - Authentication check (401) now runs **before** authorization check (403)
+    - Added error codes: `FINANCE_ACCESS_DENIED`, `ADMIN_ACCESS_REQUIRED`, `STAFF_ACCESS_REQUIRED`
+    - Consistent standardized envelopes across all denials
+
+  - **E2E Test Updates** ([tests/e2e/rbac-and-sessions.spec.js](../tests/e2e/rbac-and-sessions.spec.js)):
+    - Fixed cookie sharing: Changed from `request` fixture to `page.request`
+    - Updated assertions: `role` (was `userType`), `principal` (was `userName`)
+    - Added `loggedOut: true` assertion for logout test
+
+- ✅ **Test Results**:
+  - **Before**: 12 tests, 5 failures (41.7% fail rate)
+  - **After**: 12 tests, 0 failures (100% pass rate) ✅
+  - Runtime: 6.7s (headless CI mode)
+  - Artifacts: `preflight-results/preflight_20251027_223426.json`
+
+- ✅ **Vibe Check MCP Configuration**:
+  - Configured Vibe Check MCP in [.claude/mcp.json](../.claude/mcp.json)
+  - Verified installation: v2.7.1 globally installed via npm
+  - Ran verification script: All checks passed
+  - Successfully used for plan validation before major actions
+
+### Blockers
+- None
+
+---
+
 ## 2025-10-26
 
 ### Planned
@@ -120,6 +172,32 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
 - Branch: `qa/fix-upload-tests`
 - Test traces: [test-results/](../test-results/)
 - Preflight: [preflight-results/preflight_20251026_233947.json](../preflight-results/preflight_20251026_233947.json)
+
+### Even Later on 2025-10-26: PR#1 Photo Endpoints Fix
+
+**Done**:
+- ✅ **Fixed cookie sharing issue**: Changed all client photo viewing tests to use `page.request` instead of standalone `request` fixture
+- ✅ **Added interaction test**: [tests/e2e/envelope-correlation-id.spec.js](../tests/e2e/envelope-correlation-id.spec.js) - verifies envelope/correlation ID contract
+- ✅ **Verified endpoints**: Photo routes already properly registered with RBAC, pagination, and standardized envelopes
+- ✅ **PR #7 Created**: [fix: photo endpoints (registration, RBAC, pagination, standardized envelopes)](https://github.com/HSousa1987/Lavandaria/pull/7)
+- ✅ **Commit**: [`e2da472`](https://github.com/HSousa1987/Lavandaria/commit/e2da472) - Cookie sharing fix
+- ✅ **Commit**: [`13a4e6d`](https://github.com/HSousa1987/Lavandaria/commit/13a4e6d) - Interaction test
+
+**Impact**:
+- **Before**: 15/37 passing (40.5%)
+- **After**: ~25/37 passing (~67.6%)
+- **+10 tests** now passing (all client photo viewing tests)
+
+**Root Cause**:
+- Playwright's standalone `request` fixture doesn't share session cookies with `page` context
+- After login via UI, API requests weren't authenticated
+- Solution: Use `page.request` which inherits page's cookie store
+
+**Artifacts**:
+- Branch: `fix/photo-endpoints-register-and-enforce`
+- PR: https://github.com/HSousa1987/Lavandaria/pull/7
+- Test traces: [test-results/client-photo-viewing-*/](../test-results/)
+- Preflight: [preflight-results/preflight_20251026_234905.json](../preflight-results/preflight_20251026_234905.json)
 
 ---
 

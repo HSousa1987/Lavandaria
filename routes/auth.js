@@ -181,28 +181,93 @@ router.post('/login/client', loginLimiter, [
     }
 });
 
-// Check session
+// Check session (standardized envelope)
 router.get('/check', (req, res) => {
     if (!req.session.userType) {
-        return res.json({ authenticated: false });
+        return res.json({
+            success: false,
+            error: 'Not authenticated',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     }
 
     res.json({
-        authenticated: true,
-        userType: req.session.userType,
-        userName: req.session.userName,
-        userId: req.session.userId || req.session.clientId,
-        mustChangePassword: req.session.mustChangePassword
+        success: true,
+        data: {
+            authenticated: true,
+            userType: req.session.userType,
+            userName: req.session.userName,
+            userId: req.session.userId || req.session.clientId,
+            mustChangePassword: req.session.mustChangePassword
+        },
+        _meta: {
+            correlationId: req.correlationId,
+            timestamp: new Date().toISOString()
+        }
     });
 });
 
-// Logout
+// Session endpoint (alias for /check with standardized name)
+router.get('/session', (req, res) => {
+    if (!req.session.userType) {
+        return res.status(401).json({
+            success: false,
+            error: 'Not authenticated',
+            code: 'UNAUTHENTICATED',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+
+    res.json({
+        success: true,
+        data: {
+            authenticated: true,
+            role: req.session.userType,
+            principal: req.session.userName,
+            userId: req.session.userId || req.session.clientId,
+            mustChangePassword: req.session.mustChangePassword
+        },
+        _meta: {
+            correlationId: req.correlationId,
+            timestamp: new Date().toISOString()
+        }
+    });
+});
+
+// Logout (standardized envelope)
 router.post('/logout', (req, res) => {
     req.session.destroy((err) => {
         if (err) {
-            return res.status(500).json({ error: 'Logout failed' });
+            console.error(`❌ [AUTH] Logout failed [${req.correlationId}]:`, err);
+            return res.status(500).json({
+                success: false,
+                error: 'Logout failed',
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
         }
-        res.json({ success: true });
+
+        console.log(`✅ [AUTH] Logout successful [${req.correlationId}]`);
+        // Clear cookie explicitly
+        res.clearCookie('connect.sid');
+        res.json({
+            success: true,
+            data: {
+                loggedOut: true
+            },
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     });
 });
 

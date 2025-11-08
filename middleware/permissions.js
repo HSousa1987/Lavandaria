@@ -1,4 +1,4 @@
-// Role-based permission middleware
+// Role-based permission middleware (standardized envelopes)
 
 // Role hierarchy:
 // master - Full access, can create admins
@@ -8,7 +8,14 @@
 // Check if user is authenticated
 const requireAuth = (req, res, next) => {
     if (!req.session.userType) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return res.status(401).json({
+            success: false,
+            error: 'Authentication required',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     }
     next();
 };
@@ -16,24 +23,73 @@ const requireAuth = (req, res, next) => {
 // Master only (you)
 const requireMaster = (req, res, next) => {
     if (req.session.userType !== 'master') {
-        return res.status(403).json({ error: 'Master access required' });
+        return res.status(403).json({
+            success: false,
+            error: 'Master access required',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     }
     next();
 };
 
 // Master or Admin
 const requireMasterOrAdmin = (req, res, next) => {
+    // Check authentication first
+    if (!req.session.userType) {
+        return res.status(401).json({
+            success: false,
+            error: 'Authentication required',
+            code: 'UNAUTHENTICATED',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+
     if (req.session.userType !== 'master' && req.session.userType !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required' });
+        return res.status(403).json({
+            success: false,
+            error: 'Admin access required',
+            code: 'ADMIN_ACCESS_REQUIRED',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     }
     next();
 };
 
 // Master, Admin, or Worker
 const requireStaff = (req, res, next) => {
+    // Check authentication first
+    if (!req.session.userType) {
+        return res.status(401).json({
+            success: false,
+            error: 'Authentication required',
+            code: 'UNAUTHENTICATED',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+
     const staffRoles = ['master', 'admin', 'worker'];
     if (!staffRoles.includes(req.session.userType)) {
-        return res.status(403).json({ error: 'Staff access required' });
+        return res.status(403).json({
+            success: false,
+            error: 'Staff access required',
+            code: 'STAFF_ACCESS_REQUIRED',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     }
     next();
 };
@@ -41,15 +97,45 @@ const requireStaff = (req, res, next) => {
 // Client only
 const requireClient = (req, res, next) => {
     if (req.session.userType !== 'client') {
-        return res.status(403).json({ error: 'Client access required' });
+        return res.status(403).json({
+            success: false,
+            error: 'Client access required',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     }
     next();
 };
 
 // Finance access (Master or Admin only, NOT workers)
 const requireFinanceAccess = (req, res, next) => {
+    // Check authentication first
+    if (!req.session.userType) {
+        return res.status(401).json({
+            success: false,
+            error: 'Authentication required',
+            code: 'UNAUTHENTICATED',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+
+    // Then check finance permission
     if (req.session.userType !== 'master' && req.session.userType !== 'admin') {
-        return res.status(403).json({ error: 'Finance access denied' });
+        console.log(`🚫 [RBAC] Finance access denied for role: ${req.session.userType} [${req.correlationId}]`);
+        return res.status(403).json({
+            success: false,
+            error: 'Finance access denied',
+            code: 'FINANCE_ACCESS_DENIED',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     }
     next();
 };
@@ -69,11 +155,25 @@ const canManageUsers = (targetRole) => {
             if (targetRole === 'client' || targetRole === 'worker') {
                 return next();
             }
-            return res.status(403).json({ error: 'You cannot manage this user type' });
+            return res.status(403).json({
+                success: false,
+                error: 'You cannot manage this user type',
+                _meta: {
+                    correlationId: req.correlationId,
+                    timestamp: new Date().toISOString()
+                }
+            });
         }
 
         // Workers cannot manage users
-        return res.status(403).json({ error: 'Access denied' });
+        return res.status(403).json({
+            success: false,
+            error: 'Access denied',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
     };
 };
 
