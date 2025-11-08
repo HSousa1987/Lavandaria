@@ -38,6 +38,7 @@ const errorResponse = (res, statusCode, message, code = null, req = null) => {
     const correlationId = req?.correlationId || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const response = {
+        success: false,
         error: message,
         _meta: {
             correlationId,

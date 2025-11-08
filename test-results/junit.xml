@@ -1,0 +1,50 @@
+<testsuites id="" name="" tests="1" failures="1" skipped="0" errors="0" time="4.592665">
+<testsuite name="worker-photo-upload.spec.js" timestamp="2025-10-26T23:39:48.345Z" hostname="chromium" tests="1" failures="1" skipped="0" time="3.353" errors="0">
+<testcase name="Worker Photo Upload - Batch Limits › should successfully upload 10 photos in one batch (max batch size)" classname="worker-photo-upload.spec.js" time="3.353">
+<failure message="worker-photo-upload.spec.js:66:5 should successfully upload 10 photos in one batch (max batch size)" type="FAILURE">
+<![CDATA[  [chromium] › worker-photo-upload.spec.js:66:5 › Worker Photo Upload - Batch Limits › should successfully upload 10 photos in one batch (max batch size) 
+
+    TypeError: apiRequestContext.post: stream.on is not a function
+
+      75 |         // Upload batch via API using centralized helper
+      76 |         const formData = buildPhotoUploadForm(files);
+    > 77 |         const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, formData);
+         |                                        ^
+      78 |
+      79 |         expect(response.ok()).toBeTruthy();
+      80 |         const result = await response.json();
+        at /Applications/XAMPP/xamppfiles/htdocs/Lavandaria/tests/e2e/worker-photo-upload.spec.js:77:40
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/worker-photo-upload-Worker-4e55d-n-one-batch-max-batch-size--chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/worker-photo-upload-Worker-4e55d-n-one-batch-max-batch-size--chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/worker-photo-upload-Worker-4e55d-n-one-batch-max-batch-size--chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../test-results/worker-photo-upload-Worker-4e55d-n-one-batch-max-batch-size--chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../test-results/worker-photo-upload-Worker-4e55d-n-one-batch-max-batch-size--chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|worker-photo-upload-Worker-4e55d-n-one-batch-max-batch-size--chromium/test-failed-1.png]]
+
+[[ATTACHMENT|worker-photo-upload-Worker-4e55d-n-one-batch-max-batch-size--chromium/video.webm]]
+
+[[ATTACHMENT|worker-photo-upload-Worker-4e55d-n-one-batch-max-batch-size--chromium/error-context.md]]
+
+[[ATTACHMENT|worker-photo-upload-Worker-4e55d-n-one-batch-max-batch-size--chromium/trace.zip]]
+]]>
+</system-out>
+</testcase>
+</testsuite>
+</testsuites>

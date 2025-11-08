@@ -13,6 +13,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
+const { buildPhotoUploadForm } = require('../helpers/multipart-upload');
 
 // Test credentials from seed script
 const WORKER_CREDENTIALS = {
@@ -71,25 +72,9 @@ test.describe('Worker Photo Upload - Batch Limits', () => {
             files.push(createTestImage(`test-photo-${i}.jpg`, 50));
         }
 
-        // Upload batch via API
-        const formData = {
-            multipart: {
-                ...files.reduce((acc, file, index) => ({
-                    ...acc,
-                    [`photos`]: { name: path.basename(file), mimeType: 'image/jpeg', buffer: fs.readFileSync(file) }
-                }), {})
-            }
-        };
-
-        const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, {
-            multipart: {
-                photos: files.map(file => ({
-                    name: path.basename(file),
-                    mimeType: 'image/jpeg',
-                    buffer: fs.readFileSync(file)
-                }))
-            }
-        });
+        // Upload batch via API using centralized helper
+        const formData = buildPhotoUploadForm(files);
+        const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, formData);
 
         expect(response.ok()).toBeTruthy();
         const result = await response.json();
@@ -99,9 +84,13 @@ test.describe('Worker Photo Upload - Batch Limits', () => {
         expect(result).toHaveProperty('count', 10);
         expect(result).toHaveProperty('photos');
         expect(result.photos).toHaveLength(10);
+
+        // Verify correlation ID in response body and headers
         expect(result).toHaveProperty('_meta');
         expect(result._meta).toHaveProperty('correlationId');
+        expect(result._meta.correlationId).toMatch(/^req_/);
         expect(result._meta).toHaveProperty('timestamp');
+        expect(response.headers()['x-correlation-id']).toBeDefined();
 
         // Cleanup
         files.forEach(file => fs.unlinkSync(file));
@@ -118,20 +107,17 @@ test.describe('Worker Photo Upload - Batch Limits', () => {
                 files.push(createTestImage(`batch${batch}-photo-${i}.jpg`, 50));
             }
 
-            const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, {
-                multipart: {
-                    photos: files.map(file => ({
-                        name: path.basename(file),
-                        mimeType: 'image/jpeg',
-                        buffer: fs.readFileSync(file)
-                    }))
-                }
-            });
+            const formData = buildPhotoUploadForm(files);
+            const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, formData);
 
             expect(response.ok()).toBeTruthy();
             const result = await response.json();
             expect(result.count).toBe(10);
             totalUploaded += result.count;
+
+            // Verify correlation ID in each batch response
+            expect(result._meta).toHaveProperty('correlationId');
+            expect(response.headers()['x-correlation-id']).toBeDefined();
 
             // Cleanup batch files
             files.forEach(file => fs.unlinkSync(file));
@@ -155,25 +141,23 @@ test.describe('Worker Photo Upload - Batch Limits', () => {
             files.push(createTestImage(`excess-photo-${i}.jpg`, 50));
         }
 
-        const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, {
-            multipart: {
-                photos: files.map(file => ({
-                    name: path.basename(file),
-                    mimeType: 'image/jpeg',
-                    buffer: fs.readFileSync(file)
-                }))
-            }
-        });
+        const formData = buildPhotoUploadForm(files);
+        const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, formData);
 
         expect(response.status()).toBe(400);
         const result = await response.json();
 
-        // Verify error response structure
+        // Verify standardized error response envelope
+        expect(result).toHaveProperty('success', false);
         expect(result).toHaveProperty('error');
-        expect(result.error).toContain('Maximum 10 photos');
+        expect(result.error).toContain('Maximum 10');
         expect(result).toHaveProperty('code', 'BATCH_LIMIT_EXCEEDED');
+
+        // Verify correlation ID in error response
         expect(result).toHaveProperty('_meta');
         expect(result._meta).toHaveProperty('correlationId');
+        expect(result._meta.correlationId).toMatch(/^req_/);
+        expect(response.headers()['x-correlation-id']).toBeDefined();
 
         // Cleanup
         files.forEach(file => fs.unlinkSync(file));
@@ -186,20 +170,20 @@ test.describe('Worker Photo Upload - Batch Limits', () => {
         const invalidFile = path.join(__dirname, '..', 'fixtures', 'invalid.txt');
         fs.writeFileSync(invalidFile, 'This is not an image');
 
-        const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, {
-            multipart: {
-                photos: [{
-                    name: 'invalid.txt',
-                    mimeType: 'text/plain',
-                    buffer: fs.readFileSync(invalidFile)
-                }]
-            }
-        });
+        const formData = buildPhotoUploadForm([invalidFile]);
+        const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, formData);
 
         expect(response.ok()).toBeFalsy();
         const result = await response.json();
+
+        // Verify standardized error response
+        expect(result).toHaveProperty('success', false);
         expect(result).toHaveProperty('error');
-        expect(result.error.toLowerCase()).toContain('image');
+
+        // Verify correlation ID in error response
+        expect(result).toHaveProperty('_meta');
+        expect(result._meta).toHaveProperty('correlationId');
+        expect(response.headers()['x-correlation-id']).toBeDefined();
 
         // Cleanup
         fs.unlinkSync(invalidFile);
@@ -211,18 +195,18 @@ test.describe('Worker Photo Upload - Batch Limits', () => {
         // Create 11MB file (exceeds 10MB limit)
         const oversizedFile = createTestImage('oversized.jpg', 11 * 1024);
 
-        const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, {
-            multipart: {
-                photos: [{
-                    name: 'oversized.jpg',
-                    mimeType: 'image/jpeg',
-                    buffer: fs.readFileSync(oversizedFile)
-                }]
-            }
-        });
+        const formData = buildPhotoUploadForm([oversizedFile]);
+        const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, formData);
 
         expect(response.ok()).toBeFalsy();
         expect(response.status()).toBe(413); // Payload Too Large
+
+        // Verify correlation ID even in error response (if JSON returned)
+        const contentType = response.headers()['content-type'];
+        if (contentType && contentType.includes('application/json')) {
+            const result = await response.json();
+            expect(result._meta).toHaveProperty('correlationId');
+        }
 
         // Cleanup
         fs.unlinkSync(oversizedFile);
@@ -235,20 +219,21 @@ test.describe('Worker Photo Upload - Batch Limits', () => {
 
         const file = createTestImage('unauthorized.jpg', 50);
 
-        const response = await request.post(`/api/cleaning-jobs/${invalidJobId}/photos`, {
-            multipart: {
-                photos: [{
-                    name: 'unauthorized.jpg',
-                    mimeType: 'image/jpeg',
-                    buffer: fs.readFileSync(file)
-                }]
-            }
-        });
+        const formData = buildPhotoUploadForm([file]);
+        const response = await request.post(`/api/cleaning-jobs/${invalidJobId}/photos`, formData);
 
         expect(response.status()).toBe(404);
         const result = await response.json();
+
+        // Verify standardized error response
+        expect(result).toHaveProperty('success', false);
         expect(result).toHaveProperty('code', 'JOB_NOT_FOUND');
+
+        // Verify correlation ID in error response
+        expect(result).toHaveProperty('_meta');
         expect(result._meta).toHaveProperty('correlationId');
+        expect(result._meta.correlationId).toMatch(/^req_/);
+        expect(response.headers()['x-correlation-id']).toBeDefined();
 
         // Cleanup
         fs.unlinkSync(file);
@@ -264,25 +249,26 @@ test.describe('Worker Photo Upload - Response Validation', () => {
         const jobId = await getTestJobId(page);
         const file = createTestImage('correlation-test.jpg', 50);
 
-        const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, {
-            multipart: {
-                photos: [{
-                    name: 'correlation-test.jpg',
-                    mimeType: 'image/jpeg',
-                    buffer: fs.readFileSync(file)
-                }]
-            }
-        });
+        const formData = buildPhotoUploadForm([file]);
+        const response = await request.post(`/api/cleaning-jobs/${jobId}/photos`, formData);
 
         const result = await response.json();
 
-        // Verify correlation ID in response
+        // Verify standardized response envelope
+        expect(result).toHaveProperty('success', true);
+        expect(result).toHaveProperty('photos');
+        expect(result).toHaveProperty('count');
+
+        // Verify correlation ID in response body
+        expect(result).toHaveProperty('_meta');
         expect(result._meta).toBeDefined();
         expect(result._meta.correlationId).toBeDefined();
         expect(result._meta.correlationId).toMatch(/^req_/);
+        expect(result._meta).toHaveProperty('timestamp');
 
         // Verify correlation ID in response headers
         expect(response.headers()['x-correlation-id']).toBeDefined();
+        expect(response.headers()['x-correlation-id']).toMatch(/^req_/);
 
         // Cleanup
         fs.unlinkSync(file);

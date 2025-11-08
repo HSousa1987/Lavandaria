@@ -8,6 +8,50 @@ This log tracks bugs discovered, their root causes, fixes applied, and tests add
 
 ## Active Bugs
 
+### 2025-10-26 - Playwright Request API Does Not Support Multiple File Uploads (P2)
+
+**Evidence:**
+- Worker photo upload tests fail with `TypeError: apiRequestContext.post: stream.on is not a function`
+- Error occurs at line where `request.post()` is called with multipart form data
+- Multiple format attempts all fail with same error:
+  - Array of file paths: `multipart: { photos: ['/path/to/file1.jpg', '/path/to/file2.jpg'] }`
+  - Array of file objects: `multipart: { photos: [{name, mimeType, buffer}, {...}] }`
+  - Direct buffer passing with metadata
+- Test execution: 2025-10-26 ~23:30 UTC
+- Artifacts: [test-results/worker-photo-upload-Worker-4e55d-n-one-batch-max-batch-size--chromium/](../test-results/worker-photo-upload-Worker-4e55d-n-one-batch-size--chromium/)
+
+**Root Cause:**
+- Playwright's `request.post()` with `multipart` option doesn't support arrays of files for a single field name
+- Multer endpoint expects `upload.array('photos', 10)` which requires multiple files under the same field
+- Playwright's API may only support single file per field or requires different format not documented
+- The `stream.on is not a function` error suggests Playwright is trying to treat the array as a stream object
+
+**Impact:**
+- **7 worker photo upload E2E tests blocked** (batch limits, validation, RBAC tests)
+- Cannot test multipart upload correctness via API requests
+- Test coverage gap for photo upload batch handling
+- Cannot validate correlation IDs and envelopes in upload responses via direct API calls
+
+**Workaround Options:**
+1. **UI-based testing** (recommended): Use `page.setInputFiles()` to upload via file input element
+2. **Individual requests**: Send files one at a time (changes test semantics)
+3. **FormData construction**: Build raw multipart body manually (complex, brittle)
+4. **Axios/fetch in Node**: Use different HTTP client within test (adds dependency)
+
+**Next Steps:**
+- [ ] Switch to UI-based upload testing: `await page.locator('input[type="file"]').setInputFiles([...paths])`
+- [ ] Capture network request/response to still assert envelopes and correlation IDs
+- [ ] Keep helper abstraction so we can swap implementations
+- [ ] Document that photo upload tests use UI path, not direct API calls
+
+**Links:**
+- Commit: [`3e440bb`](https://github.com/HSousa1987/Lavandaria/commit/3e440bb)
+- Branch: `qa/fix-upload-tests`
+- Helper: [tests/helpers/multipart-upload.js](../tests/helpers/multipart-upload.js)
+- Multer endpoint: [routes/cleaning-jobs.js:568](../routes/cleaning-jobs.js#L568)
+
+---
+
 ### 2025-10-26 - Test Seed Data Missing Photo Fixtures (P1)
 
 **Evidence:**
