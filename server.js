@@ -187,7 +187,8 @@ app.use('/api/laundry-services', require('./routes/laundry-services')); // NEW s
 // Shared Routes
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/tickets', require('./routes/tickets'));
-app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/reports', require('./routes/reports'));        // Tax/financial reports
+app.use('/api/dashboard', require('./routes/dashboard'));    // Dashboard with tax endpoints
 app.use('/api/settings', require('./routes/settings'));
 
 // Serve React app (production build for E2E testing compatibility)
