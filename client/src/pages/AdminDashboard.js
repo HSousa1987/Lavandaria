@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import TaxSummary from '../components/dashboard/TaxSummary';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -322,6 +323,13 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
+
+            {/* Tax Summary - Admin/Master Only */}
+            {(user?.role === 'master' || user?.role === 'admin') && (
+              <div className="mb-8">
+                <TaxSummary />
+              </div>
+            )}
 
             {/* Recent Activity */}
             <div className="bg-white rounded-lg shadow p-6">
