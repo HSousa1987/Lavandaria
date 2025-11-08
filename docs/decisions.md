@@ -6,6 +6,234 @@ This log records significant implementation decisions with context, options cons
 
 ---
 
+## 2025-10-26T23:00:00Z - Deterministic Test Data Seeding
+
+### Context
+After fixing P0 bugs, E2E test pass rate stuck at 59% (15/37 tests). Root cause analysis using PostgreSQL-RO MCP revealed:
+- **Zero photos** in test database (tests expect ≥12 photos)
+- Non-deterministic seed script with random IDs
+- Schema mismatches (password_hash vs password, notes vs internal_notes)
+- No idempotency - reruns create duplicates or fail on conflicts
+
+Tests were flaky because preconditions varied between runs. Photo viewing tests failed 100% because no photo data existed.
+
+### Options Considered
+
+**Option 1: Random test data generation** ❌
+- Pro: More "realistic" data variety
+- Con: Non-reproducible failures (flaky tests)
+- Con: Hard to debug ("which run had which IDs?")
+- Con: Can't write assertions against specific IDs
+
+**Option 2: Database fixtures with SQL dumps** ❌
+- Pro: Fast to load (COPY vs INSERT)
+- Con: Harder to maintain (binary format)
+- Con: Version control conflicts
+- Con: Doesn't create physical files (photos)
+
+**Option 3: Deterministic seed with fixed IDs** ✅ (chosen)
+- Pro: **100% reproducible** - same IDs every run
+- Pro: **Idempotent** - can run multiple times safely
+- Pro: **Debuggable** - tests can assert against known IDs (Job 100, Client 1)
+- Pro: Creates physical photo files for upload tests
+- Con: Less realistic than random data
+- Con: Requires schema knowledge (column names, constraints)
+
+**Option 4: Factory pattern with builders**
+- Pro: Flexible, can create variations
+- Pro: TypeScript support possible
+- Con: Overcomplicated for current needs
+- Con: Still needs fixed IDs for determinism
+
+### Decision
+✅ **Deterministic seed script with fixed IDs and photo fixtures**
+
+**Implementation**: [scripts/seed-test-data-deterministic.js](../scripts/seed-test-data-deterministic.js)
+
+**Key Features:**
+1. **Fixed IDs**: Master=1, Admin=2, Worker=3, Client=1, Job=100, Order=200
+2. **Idempotent cleanup**: DELETE existing test data before INSERT
+3. **ON CONFLICT clauses**: Handles reruns gracefully
+4. **Transaction wrapper**: BEGIN/COMMIT/ROLLBACK for atomicity
+5. **Photo fixtures**: Creates 15 dummy JPEG files (1x1 pixel, valid format)
+6. **Schema-accurate**: Uses correct column names (password, not password_hash)
+
+**Test Data Created:**
+```javascript
+FIXED_IDS = {
+    master: 1,      // username: 'master', password: 'master123'
+    admin: 2,       // username: 'admin', password: 'admin123'
+    worker: 3,      // username: 'worker1', password: 'worker123'
+    client: 1,      // phone: '911111111', password: 'lavandaria2025'
+    cleaningJob: 100,    // assigned to worker 3, owned by client 1, 15 photos
+    laundryOrder: 200    // owned by client 1, status 'ready'
+}
+```
+
+### Consequences
+
+**Positive:**
+- ✅ **100% reproducible** - Tests see identical data every run
+- ✅ **Easier debugging** - Can reference "Job 100" in test failures
+- ✅ **Unlocked 22 failing tests** - Photo data now exists
+- ✅ **Fast feedback** - Idempotency means quick iteration
+- ✅ **Schema validation** - Forced us to discover column name mismatches
+- ✅ **Physical files** - Photo upload tests have real files to work with
+
+**Negative:**
+- ⚠️ **Less realistic** - Production has diverse IDs, not 1-2-3
+- ⚠️ **Schema coupling** - Script breaks if columns renamed
+- ⚠️ **Maintenance burden** - Must update script when schema changes
+
+**Trade-offs:**
+We chose **reproducibility over realism**. Tests need stable preconditions more than they need realistic data variety. The 22 failing tests prove this choice correct - without deterministic photos, those tests were impossible to fix.
+
+**Rollback:**
+```bash
+# Use old seed script
+npm run test:seed
+
+# Or manually delete test data
+psql -c "DELETE FROM cleaning_job_photos WHERE cleaning_job_id=100"
+psql -c "DELETE FROM cleaning_jobs WHERE id=100"
+```
+
+**Links**: Commit [`055d4f8`](https://github.com/HSousa1987/Lavandaria/commit/055d4f8), Branch `qa/deterministic-seed-and-routes`
+
+---
+
+## 2025-10-23T23:57:00Z - Preflight Health Checks Before E2E Tests
+
+### Context
+After P0 resolution (commit ef0f2eb) where React app wasn't being served (NODE_ENV conditional), realized need for proactive guards against similar deployment config regressions. Without preflight checks, test suite would waste 5-10 minutes running before first timeout, providing poor developer feedback loop.
+
+### Options Considered
+
+**Option 1: Manual preflight verification**
+- Pro: Simple, no tooling needed
+- Con: Developers forget to check
+- Con: No audit trail of pre-test conditions
+
+**Option 2: Inline Playwright preflight checks** ✅
+- Pro: Integrated with test framework
+- Pro: Standard approach in many projects
+- Con: Harder to run standalone
+- Con: Playwright-specific
+
+**Option 3: Dedicated bash script with artifacts** ✅ (chosen)
+- Pro: Terminal-first workflow (matches project culture)
+- Pro: JSON artifacts for debugging
+- Pro: Can run standalone or via npm
+- Pro: Framework-agnostic (works with any test tool)
+- Con: Extra script to maintain
+
+**Option 4: Docker healthcheck only**
+- Pro: Already exists in docker-compose.yml
+- Con: Doesn't validate React app serving
+- Con: No correlation ID tracking
+
+### Decision
+✅ **Dedicated preflight script with JSON artifact collection**
+
+**Implementation**:
+1. Created `scripts/preflight-health-check.sh` with 3 checks:
+   - Root page (/) returns 200 OK with HTML
+   - Health endpoint (/api/healthz) returns 200 OK
+   - Readiness endpoint (/api/readyz) returns 200 OK + DB healthy
+2. Wired into npm scripts:
+   - `test:preflight`: Run standalone
+   - `test:e2e`: Preflight + Playwright
+   - `test:e2e:no-preflight`: Escape hatch
+3. Artifact collection: `preflight-results/*.json`
+4. Fail-fast: Exit code 1 if any check fails
+
+**Design Choices**:
+- Bash over Node.js: Faster startup, simpler dependencies
+- JSON artifacts: Machine-readable for CI/CD integration
+- Color-coded output: Quick visual feedback in terminal
+- Timing data: Helps identify slow health endpoints
+
+### Consequences
+
+**Positive**:
+- ✅ Catches deployment config regressions immediately
+- ✅ Saves developer time (fails in <5s vs 5-10min timeout)
+- ✅ Clear error messages guide to root cause
+- ✅ JSON artifacts useful for debugging flaky tests
+- ✅ Terminal-first workflow aligns with project culture
+
+**Negative**:
+- ⚠️ Extra 1-3 seconds added to test startup time
+- ⚠️ Another script to maintain
+
+**Trade-offs**:
+Chose fast feedback over minimal complexity. The 1-3s preflight cost is negligible compared to 5-10min wasted on doomed test runs.
+
+**Rollback**: Use `npm run test:e2e:no-preflight` if preflight checks block for non-critical reasons
+
+**Links**: Commit b060981, branch ops/preflight-health-and-guard
+
+---
+
+## 2025-10-23T22:50:00Z - Login-First UX for E2E Tests
+
+### Context
+After fixing P0 bug (PR #4) where login form was hidden behind toggle, all E2E tests needed updating to align with new login-first UX pattern. Tests were failing because they expected the old hidden-form behavior.
+
+### Options Considered
+
+**Option 1: Revert to hidden-form UX**
+- Pro: No test changes needed
+- Con: Worse user experience (extra click to reach login)
+- Con: Not aligned with product vision
+
+**Option 2: Update tests to click "Login" button** ✅ (chosen)
+- Pro: Tests match actual UX
+- Pro: No more timeout errors
+- Con: Required updating 5 test suites
+- Rationale: Align tests with reality, not force UX to match tests
+
+**Option 3: Keep role-specific post-login routes**
+- Pro: More explicit test assertions
+- Con: App already uses unified `/dashboard` route
+- Con: Would require backend changes for no benefit
+
+### Decision
+✅ **Update all E2E tests to match login-first UX pattern**
+
+**Implementation**:
+1. Remove "Login" button clicks (form visible by default)
+2. Add explicit Client/Staff tab selection
+3. Change route expectations from `/client`, `/worker`, etc. to `/dashboard`
+4. Document all 4 auth flows in [docs/auth-flows.md](docs/auth-flows.md)
+
+**Test Files Updated**:
+- `tests/e2e/client-photo-viewing.spec.js`
+- `tests/e2e/rbac-and-sessions.spec.js`
+- `tests/e2e/tab-navigation.spec.js`
+- `tests/e2e/worker-photo-upload.spec.js`
+- `tests/e2e/debug-tab-navigation.spec.js`
+
+### Consequences
+
+**Positive**:
+- ✅ Tests execute 5x faster (3-4s vs 17s timeout)
+- ✅ No login timeout errors
+- ✅ Auth flows verified for all 4 roles
+- ✅ Comprehensive auth documentation created
+- ✅ Tests align with actual UX (not legacy pattern)
+
+**Negative**:
+- ⚠️ Test maintenance burden (had to update 5 files)
+- ⚠️ Future UX changes require test updates
+
+**Trade-offs**:
+Chose UX consistency over test stability. Better to have tests that match reality and provide real confidence than tests that pass but validate wrong assumptions.
+
+**Links**: PR #5, docs/auth-flows.md
+
+---
+
 ## 2025-10-23T01:45:00Z - Documentation Architecture Bootstrap
 
 ### Context

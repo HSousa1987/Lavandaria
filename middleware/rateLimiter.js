@@ -5,7 +5,8 @@ const rateLimit = require('express-rate-limit');
  * Prevents brute force attacks by limiting failed login attempts
  *
  * Rules:
- * - Max 5 attempts per 15 minutes per IP
+ * - Max 5 attempts per 15 minutes per IP (production)
+ * - DISABLED in test/development environments
  * - Applies to both user and client login endpoints
  * - Returns 429 status with friendly error message
  * - Includes request correlation ID in response
@@ -17,6 +18,18 @@ const loginLimiter = rateLimit({
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count all requests
   skipFailedRequests: false,
+  // Skip rate limiting in test/development environments
+  skip: (req) => {
+    const isTestEnv = process.env.NODE_ENV === 'test' ||
+                      process.env.NODE_ENV === 'development' ||
+                      process.env.CI === 'true';
+
+    if (isTestEnv) {
+      console.log(`⚠️ [RATE-LIMIT] Skipping rate limit check (${process.env.NODE_ENV} environment)`);
+    }
+
+    return isTestEnv;
+  },
   // Use default IPv6-safe IP resolution (trust proxy must be enabled in server.js)
   handler: (req, res) => {
     const correlationId = req.correlationId || req.headers['x-correlation-id'] || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

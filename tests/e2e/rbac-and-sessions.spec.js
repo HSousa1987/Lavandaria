@@ -36,10 +36,13 @@ test.describe('RBAC - Finance Access Restrictions', () => {
     test('worker cannot access finance routes', async ({ page, request }) => {
         // Login as worker
         await page.goto('/');
+        // Login form is visible by default - select Staff tab
+        await page.click('button:has-text("Staff")');
         await page.fill('input[name="username"]', CREDENTIALS.worker.username);
         await page.fill('input[name="password"]', CREDENTIALS.worker.password);
         await page.click('button[type="submit"]');
-        await page.waitForURL('/worker', { timeout: 10000 });
+        // All users navigate to /dashboard after login
+        await page.waitForURL('/dashboard', { timeout: 10000 });
 
         // Test each finance route
         for (const route of FINANCE_ROUTES) {
@@ -60,10 +63,13 @@ test.describe('RBAC - Finance Access Restrictions', () => {
     test('admin can access finance routes', async ({ page, request }) => {
         // Login as admin
         await page.goto('/');
+        // Login form is visible by default - select Staff tab
+        await page.click('button:has-text("Staff")');
         await page.fill('input[name="username"]', CREDENTIALS.admin.username);
         await page.fill('input[name="password"]', CREDENTIALS.admin.password);
         await page.click('button[type="submit"]');
-        await page.waitForURL(/\/admin|\/dashboard/, { timeout: 10000 });
+        // All users navigate to /dashboard after login
+        await page.waitForURL('/dashboard', { timeout: 10000 });
 
         // Test dashboard route (admin should have access)
         const response = await request.get('/api/dashboard');
@@ -75,10 +81,13 @@ test.describe('RBAC - Finance Access Restrictions', () => {
     test('master can access all routes', async ({ page, request }) => {
         // Login as master
         await page.goto('/');
+        // Login form is visible by default - select Staff tab
+        await page.click('button:has-text("Staff")');
         await page.fill('input[name="username"]', CREDENTIALS.master.username);
         await page.fill('input[name="password"]', CREDENTIALS.master.password);
         await page.click('button[type="submit"]');
-        await page.waitForURL(/\/master|\/dashboard/, { timeout: 10000 });
+        // All users navigate to /dashboard after login
+        await page.waitForURL('/dashboard', { timeout: 10000 });
 
         // Master should have access to all routes
         for (const route of FINANCE_ROUTES) {
@@ -92,11 +101,15 @@ test.describe('RBAC - Staff Route Restrictions', () => {
     test('client cannot access staff routes', async ({ page, request }) => {
         // Login as client
         await page.goto('/');
-        await page.click('text=Client Login', { timeout: 5000 }).catch(() => {});
+        // Login form is visible by default - Client tab is default
+        await page.click('button:has-text("Client")').catch(() => {
+            console.log('Client tab already selected');
+        });
         await page.fill('input[name="phone"]', CREDENTIALS.client.phone);
         await page.fill('input[name="password"]', CREDENTIALS.client.password);
         await page.click('button[type="submit"]');
-        await page.waitForURL('/client', { timeout: 10000 });
+        // All users navigate to /dashboard after login
+        await page.waitForURL('/dashboard', { timeout: 10000 });
 
         // Test staff routes that require staff access
         const staffOnlyRoutes = [
@@ -144,10 +157,13 @@ test.describe('Session Behavior', () => {
     test('session persists across page reloads', async ({ page }) => {
         // Login as worker
         await page.goto('/');
+        // Login form is visible by default - select Staff tab
+        await page.click('button:has-text("Staff")');
         await page.fill('input[name="username"]', CREDENTIALS.worker.username);
         await page.fill('input[name="password"]', CREDENTIALS.worker.password);
         await page.click('button[type="submit"]');
-        await page.waitForURL('/worker', { timeout: 10000 });
+        // All users navigate to /dashboard after login
+        await page.waitForURL('/dashboard', { timeout: 10000 });
 
         // Verify session works
         const response1 = await page.request.get('/api/cleaning-jobs');
@@ -165,10 +181,13 @@ test.describe('Session Behavior', () => {
     test('session check endpoint returns user info', async ({ page, request }) => {
         // Login as admin
         await page.goto('/');
+        // Login form is visible by default - select Staff tab
+        await page.click('button:has-text("Staff")');
         await page.fill('input[name="username"]', CREDENTIALS.admin.username);
         await page.fill('input[name="password"]', CREDENTIALS.admin.password);
         await page.click('button[type="submit"]');
-        await page.waitForURL(/\/admin|\/dashboard/, { timeout: 10000 });
+        // All users navigate to /dashboard after login
+        await page.waitForURL('/dashboard', { timeout: 10000 });
 
         // Check session endpoint
         const response = await request.get('/api/auth/check');
@@ -183,10 +202,13 @@ test.describe('Session Behavior', () => {
     test('logout clears session and denies access', async ({ page, request }) => {
         // Login
         await page.goto('/');
+        // Login form is visible by default - select Staff tab
+        await page.click('button:has-text("Staff")');
         await page.fill('input[name="username"]', CREDENTIALS.worker.username);
         await page.fill('input[name="password"]', CREDENTIALS.worker.password);
         await page.click('button[type="submit"]');
-        await page.waitForURL('/worker', { timeout: 10000 });
+        // All users navigate to /dashboard after login
+        await page.waitForURL('/dashboard', { timeout: 10000 });
 
         // Verify authenticated
         const beforeLogout = await request.get('/api/cleaning-jobs');
@@ -212,18 +234,25 @@ test.describe('Session Behavior', () => {
         try {
             // Login as worker
             await workerPage.goto('/');
+            // Login form is visible by default - select Staff tab
+            await workerPage.click('button:has-text("Staff")');
             await workerPage.fill('input[name="username"]', CREDENTIALS.worker.username);
             await workerPage.fill('input[name="password"]', CREDENTIALS.worker.password);
             await workerPage.click('button[type="submit"]');
-            await workerPage.waitForURL('/worker', { timeout: 10000 });
+            // All users navigate to /dashboard after login
+            await workerPage.waitForURL('/dashboard', { timeout: 10000 });
 
             // Login as client
             await clientPage.goto('/');
-            await clientPage.click('text=Client Login', { timeout: 5000 }).catch(() => {});
+            // Login form is visible by default - Client tab is default
+            await clientPage.click('button:has-text("Client")').catch(() => {
+                console.log('Client tab already selected');
+            });
             await clientPage.fill('input[name="phone"]', CREDENTIALS.client.phone);
             await clientPage.fill('input[name="password"]', CREDENTIALS.client.password);
             await clientPage.click('button[type="submit"]');
-            await clientPage.waitForURL('/client', { timeout: 10000 });
+            // All users navigate to /dashboard after login
+            await clientPage.waitForURL('/dashboard', { timeout: 10000 });
 
             // Verify both sessions work independently
             const workerResponse = await workerPage.request.get('/api/cleaning-jobs');

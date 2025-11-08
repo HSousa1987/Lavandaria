@@ -25,14 +25,16 @@ const WORKER_CREDENTIALS = {
 // Helper to login as client
 async function loginAsClient(page) {
     await page.goto('/');
-    // Click client login tab/button if dual login interface
-    await page.click('text=Client Login', { timeout: 5000 }).catch(() => {
-        console.log('Single login interface detected');
+    // Login form is visible by default (login-first UX)
+    // Select client tab (form has client/staff tabs)
+    await page.click('button:has-text("Client")').catch(() => {
+        console.log('Client tab already selected');
     });
     await page.fill('input[name="phone"]', CLIENT_CREDENTIALS.phone);
     await page.fill('input[name="password"]', CLIENT_CREDENTIALS.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL('/client', { timeout: 10000 });
+    // All users navigate to /dashboard after login
+    await page.waitForURL('/dashboard', { timeout: 10000 });
 }
 
 // Helper to get client's job ID
