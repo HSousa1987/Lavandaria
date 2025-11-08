@@ -12,13 +12,43 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
 - [x] Create clean baseline (v1.2.0-baseline tag)
 - [x] Update preflight script for new health response format
 - [x] Fix health endpoint response format (WO-20251108-fix-rbac-test-failures)
+- [x] Implement Tax Management system (WO-20251108-tax-management)
 - [ ] Create delivery record for WO-20251108-pr-merge-audit
 - [ ] Execute WO-20251030-worker-ui-photo-consolidation
 
 ### Doing
-- Completing documentation updates for health endpoint fix
+- Running E2E tests for regression validation post-tax-management implementation
 
 ### Done
+- ✅ **Tax Management Implementation** ([WO-20251108-tax-management](../handoff/WO-20251108-tax-management.md)):
+  - **Database Schema**: Added VAT fields to `cleaning_jobs` and `laundry_orders_new`
+    - Columns: `subtotal_before_vat`, `vat_rate` (default 23% Portuguese IVA), `vat_amount`, `total_with_vat`
+    - Automatic calculation via database triggers (PL/pgSQL functions)
+    - Backfilled 137 historical records with calculated VAT using reverse formula: `total_cost / 1.23`
+    - Backward compatibility: `total_cost` and `total_price` synchronized with `total_with_vat`
+
+  - **API Endpoints** ([routes/reports.js](../routes/reports.js)):
+    - `GET /api/reports/tax/quarterly?year=2025&quarter=1` - Quarterly IVA summary
+    - `GET /api/reports/tax/annual?year=2025` - Annual tax report with quarterly breakdown
+    - `GET /api/dashboard/tax-summary` - Current quarter dashboard overview
+    - All endpoints require `requireFinanceAccess` middleware (Admin/Master only)
+    - Standardized response envelope with `_meta.correlationId` for audit trail
+
+  - **Frontend Component** ([client/src/components/dashboard/TaxSummary.jsx](../client/src/components/dashboard/TaxSummary.jsx)):
+    - React component fetching from `/api/dashboard/tax-summary`
+    - Displays: Total VAT Collected, Subtotal (excl. VAT), Total (incl. VAT), VAT by Service breakdown
+    - Loading state with skeleton animation, error handling with user-friendly fallback
+    - Integrated into AdminDashboard with conditional RBAC rendering for admin/master only
+
+  - **Validation**:
+    - VAT fields verified in database schema
+    - Sample calculation verified: €19.25 subtotal + €4.43 VAT (23%) = €23.68 total ✓
+    - React client rebuilt successfully (102.42 kB after gzip)
+
+  - **Documentation**:
+    - Updated docs/progress.md, docs/decisions.md (VAT implementation rationale), docs/architecture.md (tax tracking section)
+    - Added PR #XX to track work order completion
+
 - ✅ **Health Endpoint Response Format Fix** ([WO-20251108-fix-rbac-test-failures](../handoff/WO-20251108-fix-rbac-test-failures.md)):
   - **Root Cause**: Docker cached old version of routes/health.js (flat format)
   - **Fix Applied**:

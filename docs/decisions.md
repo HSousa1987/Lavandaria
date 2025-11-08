@@ -6,6 +6,70 @@ This log records significant implementation decisions with context, options cons
 
 ---
 
+## 2025-11-08T10:15:00Z - Portuguese VAT Implementation (23% IVA)
+
+### Context
+Business operates in Portugal, requires tax compliance and reporting:
+- Quarterly IVA reporting to government
+- Invoice generation needs VAT breakdown
+- Dashboard should show tax overview
+- Historical data exists without VAT fields (must preserve backward compatibility)
+
+### Options Considered
+
+**Option 1: Add VAT fields to existing tables** ✅
+- Pro: Direct relationship: each job/order has exactly one VAT amount
+- Pro: Simpler queries (no joins needed for basic operations)
+- Pro: Triggers handle automatic calculation (no code duplication)
+- Pro: Historical backfill preserves existing data
+- Pro: Backward compatibility: keep total_cost/total_price fields synchronized
+- Con: Denormalized data (total_cost == total_with_vat initially)
+
+**Option 2: Create separate VAT_transactions table**
+- Pro: Pure normalization, separates VAT from order data
+- Con: Requires JOIN queries even for basic order retrieval
+- Con: More complex backfill logic
+- Con: Slower reporting queries (multiple table scans)
+- Con: Harder to handle order deletions (cascading deletes)
+
+**Option 3: Calculate VAT on-the-fly in queries**
+- Pro: No schema changes needed
+- Con: Repeats calculation in every query (code duplication)
+- Con: Slow for reporting (calculates millions of records every time)
+- Con: No audit trail (can't trace which rate was applied)
+
+### Decision
+✅ **Option 1: Add VAT fields to existing tables**
+
+Rationale:
+- Automatic VAT calculation via database triggers (declarative, no code bugs)
+- No application code changes needed for calculations
+- Easy quarterly/annual reporting queries
+- Historical records preserved with backfill formula: `subtotal = total_cost / 1.23`
+- Future-proof: can add multiple VAT rates (reduced, exempt) by extending trigger logic
+
+### Consequences
+
+**Positive:**
+- ✅ Automatic VAT calculation via PL/pgSQL triggers on INSERT/UPDATE
+- ✅ 137 historical records backfilled with calculated VAT (€19.25 subtotal + €4.43 VAT = €23.68)
+- ✅ New API endpoints for quarterly/annual tax reporting
+- ✅ Dashboard widget shows tax overview at a glance
+- ✅ Full RBAC enforcement (Finance access only)
+- ✅ Audit trail via correlation IDs
+
+**Negative:**
+- Redundant data (total_cost == total_with_vat for now)
+- Migration required for existing records
+- Need to maintain trigger logic for future tax rate changes
+
+**Follow-up:**
+- Document VAT rate changes process (if Portugal updates rates)
+- Consider tax exemption handling for future B2B orders
+- Design for multi-country support if expanding outside Portugal
+
+---
+
 ## 2025-11-08T04:05:00Z - Docker Container Cache Invalidation Strategy
 
 ### Context

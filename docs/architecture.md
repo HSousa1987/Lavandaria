@@ -455,6 +455,66 @@ payments_laundry.laundry_order_id → laundry_orders_new.id (never NULL)
 
 ---
 
+#### Tax/VAT Tracking (23% Portuguese IVA)
+
+**VAT Fields on Order Tables**
+
+Both `cleaning_jobs` and `laundry_orders_new` include VAT tracking columns:
+
+```sql
+-- Added to both tables
+subtotal_before_vat NUMERIC(10,2)  -- Base amount before VAT
+vat_rate NUMERIC(5,2) DEFAULT 23.00 -- Portuguese IVA percentage
+vat_amount NUMERIC(10,2)            -- Calculated VAT (subtotal * vat_rate / 100)
+total_with_vat NUMERIC(10,2)        -- Final total including VAT
+```
+
+**Automatic VAT Calculation**
+
+Database triggers fire on INSERT/UPDATE:
+```sql
+-- trigger_calculate_cleaning_vat on cleaning_jobs
+-- trigger_calculate_laundry_vat on laundry_orders_new
+
+-- Formula: vat_amount = ROUND(subtotal * (vat_rate / 100), 2)
+-- Then: total_with_vat = subtotal + vat_amount
+```
+
+**Backward Compatibility**
+
+Original `total_cost` (cleaning_jobs) and `total_price` (laundry_orders_new) fields are kept synchronized:
+```sql
+-- In trigger: NEW.total_cost := NEW.total_with_vat
+-- Allows existing queries to work without modification
+```
+
+**Historical Data Backfill**
+
+137 records backfilled with reverse calculation:
+```sql
+-- Formula: subtotal_before_vat = ROUND(total_cost / 1.23, 2)
+-- Assumes existing totals included VAT at 23%
+-- Example: €23.68 total → €19.25 subtotal + €4.43 VAT ✓
+```
+
+**Tax Reporting API**
+
+Three endpoints for compliance reporting (requireFinanceAccess):
+- `GET /api/reports/tax/quarterly?year=2025&quarter=1`
+- `GET /api/reports/tax/annual?year=2025`
+- `GET /api/dashboard/tax-summary` (current quarter)
+
+**Dashboard Widget**
+
+React component displays:
+- Total VAT collected (current quarter)
+- Subtotal (excluding VAT)
+- Total (including VAT)
+- Breakdown by service type (cleaning vs laundry)
+- Conditional rendering for Admin/Master roles only
+
+---
+
 #### Supporting Tables
 
 **`properties` - Client Addresses**
