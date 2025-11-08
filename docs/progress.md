@@ -4,6 +4,44 @@ Daily progress tracking for the Lavandaria project. Format: **Planned / Doing / 
 
 ---
 
+## 2025-11-08
+
+### Planned
+- [x] Merge 9 of 10 open PRs in dependency-safe sequence
+- [x] Validate no regressions (maintain ≥87.2% E2E pass rate)
+- [x] Create clean baseline (v1.2.0-baseline tag)
+- [x] Update preflight script for new health response format
+- [ ] Create delivery record for WO-20251108-pr-merge-audit
+- [ ] Execute WO-20251030-worker-ui-photo-consolidation
+
+### Doing
+- Updating documentation for PR merge work order completion
+
+### Done
+- ✅ **PR Merge Audit Complete** ([WO-20251108-pr-merge-audit](../handoff/WO-20251108-pr-merge-audit.md)):
+  - **PRs Merged**: #1 (tab nav), #2 (docs purge), #3 (docs bootstrap), #4 (login visibility), #5 (E2E auth), #6 (deterministic seed), #7 (photo endpoints), #8 (session/RBAC), #10 (session persist)
+  - **Sequence**: Foundation → Infrastructure → UI Fixes → Features
+  - **Deferred**: PR #9 (DRAFT/BLOCKED - requires WO-20251030 first)
+
+- ✅ **Preflight Script Fix** ([commit 8ec9177](https://github.com/HSousa1987/Lavandaria/commit/8ec9177)):
+  - Updated [scripts/preflight-health-check.sh](../scripts/preflight-health-check.sh) to support both health response formats
+  - Legacy format: `data.checks.database.status='ok'`
+  - New format: `database.connected=true` (from PR #8)
+  - Maintains backward compatibility
+
+- ✅ **E2E Test Validation**:
+  - **Before Merges**: 41/47 passing (87.2%)
+  - **After Merges**: 41/47 passing (87.2%) ✅ **NO REGRESSIONS**
+  - **Artifacts**: [preflight-results/final-baseline-20251108.log](../preflight-results/final-baseline-20251108.log)
+  - **Failing Tests** (pre-existing): Same 6 failures as before (login timeout, golden path, keyboard nav, mobile viewport, laundry workflow, multi-batch)
+
+- ✅ **Baseline Tagged**: `v1.2.0-baseline` created and pushed to GitHub
+
+### Blockers
+- None - clean baseline established for new development
+
+---
+
 ## 2025-10-27
 
 ### Planned

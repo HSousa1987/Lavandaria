@@ -6,6 +6,77 @@ This log records significant implementation decisions with context, options cons
 
 ---
 
+## 2025-11-08T03:45:00Z - Preflight Script Health Response Format Compatibility
+
+### Context
+After merging PR #8 (Session/Health/RBAC standardization), the preflight health check started failing with:
+```
+✗ Readiness endpoint returned 200, DB status:
+❌ PREFLIGHT FAILED: App or database not ready
+```
+
+PR #8 refactored `/api/readyz` endpoint response structure:
+- **Old format**: `{data: {checks: {database: {status: 'ok'}}}}`
+- **New format**: `{database: {connected: true, latency: 1}}`
+
+Preflight script only checked for old format, causing false negatives.
+
+### Options Considered
+
+**Option 1: Revert PR #8 to restore old format** ❌
+- Pro: Immediate fix, no script changes needed
+- Con: Loses cleaner response structure from PR #8
+- Con: Doesn't address root cause (brittle format assumptions)
+
+**Option 2: Update script to only check new format** ❌
+- Pro: Simple, aligns with current implementation
+- Con: Breaks backward compatibility if endpoint reverts
+- Con: Fragile during transition periods
+
+**Option 3: Support both formats with dual checks** ✅ (chosen)
+- Pro: **Backward compatible** - works with both old and new formats
+- Pro: **Resilient** - survives endpoint refactors
+- Pro: **Migration-friendly** - handles transition periods
+- Con: Slightly more complex logic (marginal)
+
+**Option 4: Mock/stub health endpoint in tests**
+- Pro: Isolates test from endpoint changes
+- Con: Defeats purpose of integration check
+- Con: Won't catch real deployment issues
+
+### Decision
+✅ **Dual-format preflight script** ([commit 8ec9177](https://github.com/HSousa1987/Lavandaria/commit/8ec9177))
+
+Implementation:
+```bash
+# Support both old format (data.checks.database.status) and new format (database.connected)
+DB_STATUS=$(echo "$BODY" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('data', {}).get('checks', {}).get('database', {}).get('status', ''))" 2>/dev/null || echo "")
+DB_CONNECTED=$(echo "$BODY" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('database', {}).get('connected', ''))" 2>/dev/null || echo "")
+
+if [[ "$HTTP_CODE" == "200" ]] && ( [[ "$DB_STATUS" == "ok" ]] || [[ "$DB_CONNECTED" == "True" ]] ); then
+    # Check passes with either format
+fi
+```
+
+### Consequences
+
+**Positive:**
+- ✅ Preflight checks pass immediately after PR merge
+- ✅ No false negatives blocking E2E test runs
+- ✅ Future-proof against similar refactors
+- ✅ Clear precedent for handling format migrations
+
+**Negative:**
+- ⚠️ Technical debt: Eventually should standardize on single format
+- ⚠️ Increased cognitive load: developers must know both formats exist
+
+**Follow-up Actions:**
+- Document the dual-format pattern in [CLAUDE.md](../CLAUDE.md) health check section
+- Consider adding format version to response (`_meta.apiVersion`) for future migrations
+- Schedule quarterly review to remove old format support when safe
+
+---
+
 ## 2025-10-26T23:00:00Z - Deterministic Test Data Seeding
 
 ### Context
