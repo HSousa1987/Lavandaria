@@ -78,4 +78,88 @@ router.get('/stats', requireFinanceAccess, async (req, res) => {
     }
 });
 
+// ============================================
+// DASHBOARD TAX SUMMARY (Current Quarter)
+// ============================================
+// GET /api/dashboard/tax-summary
+router.get('/tax-summary', requireFinanceAccess, async (req, res) => {
+    try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1; // 1-12
+        const quarter = Math.ceil(month / 3);
+
+        const startMonth = (quarter - 1) * 3 + 1;
+        const endMonth = startMonth + 2;
+        const startDate = `${year}-${String(startMonth).padStart(2, '0')}-01`;
+        const endDate = `${year}-${String(endMonth).padStart(2, '0')}-31`;
+
+        // Get current quarter VAT
+        const cleaningVAT = await pool.query(`
+            SELECT
+                SUM(subtotal_before_vat) as subtotal,
+                SUM(vat_amount) as vat,
+                SUM(total_with_vat) as total
+            FROM cleaning_jobs
+            WHERE DATE(created_at) >= $1 AND DATE(created_at) <= $2
+                AND status != 'cancelled'
+        `, [startDate, endDate]);
+
+        const laundryVAT = await pool.query(`
+            SELECT
+                SUM(subtotal_before_vat) as subtotal,
+                SUM(vat_amount) as vat,
+                SUM(total_with_vat) as total
+            FROM laundry_orders_new
+            WHERE DATE(created_at) >= $1 AND DATE(created_at) <= $2
+                AND status != 'cancelled'
+        `, [startDate, endDate]);
+
+        const totalSubtotal = (parseFloat(cleaningVAT.rows[0].subtotal) || 0) +
+                               (parseFloat(laundryVAT.rows[0].subtotal) || 0);
+        const totalVAT = (parseFloat(cleaningVAT.rows[0].vat) || 0) +
+                         (parseFloat(laundryVAT.rows[0].vat) || 0);
+        const totalWithVAT = (parseFloat(cleaningVAT.rows[0].total) || 0) +
+                             (parseFloat(laundryVAT.rows[0].total) || 0);
+
+        res.json({
+            success: true,
+            data: {
+                currentPeriod: {
+                    year,
+                    quarter,
+                    startDate,
+                    endDate
+                },
+                vatSummary: {
+                    subtotal: parseFloat(totalSubtotal.toFixed(2)),
+                    vat: parseFloat(totalVAT.toFixed(2)),
+                    totalWithVAT: parseFloat(totalWithVAT.toFixed(2)),
+                    vatRate: 23.00
+                },
+                breakdown: {
+                    cleaning: parseFloat((cleaningVAT.rows[0].vat || 0).toFixed(2)),
+                    laundry: parseFloat((laundryVAT.rows[0].vat || 0).toFixed(2))
+                }
+            },
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
+
+    } catch (error) {
+        console.error(`[${req.correlationId}] Error fetching tax summary:`, error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch tax summary',
+            code: 'SERVER_ERROR',
+            _meta: {
+                correlationId: req.correlationId,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+});
+
 module.exports = router;
