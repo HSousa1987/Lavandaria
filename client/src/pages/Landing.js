@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -21,7 +21,8 @@ const Landing = () => {
     }
   }, [user, navigate]);
 
-  const handleSubmit = async (e) => {
+  // Define handleSubmit BEFORE it's used in useEffect
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -60,7 +61,39 @@ const Landing = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, formData, login, navigate]);
+
+  // Workaround for React event delegation failure: use document-level event delegation
+  // This is necessary because React's synthetic event system isn't properly attaching
+  // event handlers to form elements in this component. Using document-level event capture
+  // bypasses React's event delegation and directly triggers the handler.
+  useEffect(() => {
+    // Add global click listener on document that bubbles down to our form button
+    const handleDocumentClick = async (e) => {
+      // Check if the clicked element is the login button (contains "Login" text)
+      const button = e.target.closest('button');
+      if (!button) return;
+
+      const buttonText = button.textContent.trim();
+      if (!buttonText.includes('Login') && !buttonText.includes('Logging in')) return;
+
+      // Verify the button is in a form (our login form)
+      const form = button.closest('form');
+      if (!form) return;
+
+      // Now we know this is our login button
+      console.log('[VANILLA-JS] Login button clicked via document listener');
+      e.preventDefault();
+      await handleSubmit(e);
+    };
+
+    // Use capture phase to intercept clicks before React
+    document.addEventListener('click', handleDocumentClick, true);
+
+    return () => {
+      document.removeEventListener('click', handleDocumentClick, true);
+    };
+  }, [handleSubmit]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
