@@ -1,0 +1,56 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - heading "Lavandaria Dashboard" [level=1] [ref=e8]
+        - paragraph [ref=e9]: Welcome, Administrator (admin)
+      - button "Logout" [ref=e10] [cursor=pointer]
+  - main [ref=e11]:
+    - tablist [ref=e14]:
+      - tab "Overview" [ref=e15] [cursor=pointer]
+      - tab "Workers" [ref=e16] [cursor=pointer]
+      - tab "Clients" [ref=e17] [cursor=pointer]
+      - tab "All Jobs" [ref=e18] [cursor=pointer]
+      - tab "Cleaning Jobs" [active] [selected] [ref=e19] [cursor=pointer]
+      - tab "Laundry Orders" [ref=e20] [cursor=pointer]
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - heading "Cleaning Jobs" [level=2] [ref=e23]
+        - button "Create Cleaning Job" [ref=e24] [cursor=pointer]
+      - table [ref=e26]:
+        - rowgroup [ref=e27]:
+          - row "Type Client Address Scheduled Status Cost Actions" [ref=e28]:
+            - cell "Type" [ref=e29]
+            - cell "Client" [ref=e30]
+            - cell "Address" [ref=e31]
+            - cell "Scheduled" [ref=e32]
+            - cell "Status" [ref=e33]
+            - cell "Cost" [ref=e34]
+            - cell "Actions" [ref=e35]
+        - rowgroup [ref=e36]:
+          - row "airbnb João Santos Apartment 12B, Rua das Flores 11/11/2025 10:00:00 scheduled €0.00 View Details Edit" [ref=e37]:
+            - cell "airbnb" [ref=e38]
+            - cell "João Santos" [ref=e39]
+            - cell "Apartment 12B, Rua das Flores" [ref=e40]
+            - cell "11/11/2025 10:00:00" [ref=e41]
+            - cell "scheduled" [ref=e42]
+            - cell "€0.00" [ref=e43]
+            - cell "View Details Edit" [ref=e44]:
+              - generic [ref=e45]:
+                - button "View Details" [ref=e46] [cursor=pointer]
+                - button "Edit" [ref=e47] [cursor=pointer]
+          - row "airbnb João Santos Test Apartment, Avenida da Liberdade, 100 11/10/2025 10:00:00 scheduled €0.00 View Details Edit" [ref=e48]:
+            - cell "airbnb" [ref=e49]
+            - cell "João Santos" [ref=e50]
+            - cell "Test Apartment, Avenida da Liberdade, 100" [ref=e51]
+            - cell "11/10/2025 10:00:00" [ref=e52]
+            - cell "scheduled" [ref=e53]
+            - cell "€0.00" [ref=e54]
+            - cell "View Details Edit" [ref=e55]:
+              - generic [ref=e56]:
+                - button "View Details" [ref=e57] [cursor=pointer]
+                - button "Edit" [ref=e58] [cursor=pointer]
+```

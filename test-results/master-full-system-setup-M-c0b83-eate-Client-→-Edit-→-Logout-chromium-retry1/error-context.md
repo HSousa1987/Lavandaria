@@ -1,0 +1,44 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e8]:
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - img [ref=e13]
+        - generic [ref=e15]:
+          - heading "Lavandaria" [level=1] [ref=e16]
+          - paragraph [ref=e17]: Premium Cleaning Services
+      - button "Back" [ref=e18] [cursor=pointer]
+  - generic [ref=e20]:
+    - heading "Welcome Back" [level=2] [ref=e21]
+    - paragraph [ref=e22]: Login to access your account
+    - generic [ref=e23]:
+      - button "Client" [ref=e24] [cursor=pointer]
+      - button "Staff" [ref=e25] [cursor=pointer]
+    - generic [ref=e26]:
+      - generic [ref=e27]: Invalid credentials
+      - generic [ref=e28]:
+        - generic [ref=e29]: Username
+        - generic [ref=e30]:
+          - generic:
+            - img
+          - textbox "Enter your username" [ref=e31]: "912000000"
+      - generic [ref=e32]:
+        - generic [ref=e33]: Password
+        - generic [ref=e34]:
+          - generic:
+            - img
+          - textbox "Enter your password" [ref=e35]: master123
+      - button "Login" [ref=e36] [cursor=pointer]
+  - contentinfo [ref=e37]:
+    - generic [ref=e39]:
+      - generic [ref=e40]: © 2025 Lavandaria. All rights reserved.
+      - generic [ref=e41]:
+        - link "Privacy Policy" [ref=e42] [cursor=pointer]:
+          - /url: "#"
+        - link "Terms of Service" [ref=e43] [cursor=pointer]:
+          - /url: "#"
+        - link "Contact" [ref=e44] [cursor=pointer]:
+          - /url: "#"
+```

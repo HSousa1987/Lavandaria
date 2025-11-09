@@ -24,17 +24,37 @@ const WORKER_CREDENTIALS = {
 
 // Helper to login as client
 async function loginAsClient(page) {
-    await page.goto('/');
-    // Login form is visible by default (login-first UX)
-    // Select client tab (form has client/staff tabs)
-    await page.click('button:has-text("Client")').catch(() => {
-        console.log('Client tab already selected');
-    });
-    await page.fill('input[name="phone"]', CLIENT_CREDENTIALS.phone);
-    await page.fill('input[name="password"]', CLIENT_CREDENTIALS.password);
-    await page.click('button[type="submit"]');
-    // All users navigate to /dashboard after login
-    await page.waitForURL('/dashboard', { timeout: 10000 });
+    await page.goto('http://localhost:3000');
+    // Wait for page to load
+    await page.waitForLoadState('networkidle');
+
+    // Check if already logged in by trying to access dashboard
+    const currentUrl = page.url();
+    if (currentUrl.includes('dashboard')) {
+        // Already logged in, logout first
+        const logoutBtn = page.getByRole('button', { name: /logout/i });
+        if (await logoutBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await logoutBtn.click();
+            await page.waitForURL(/\/$/, { timeout: 5000 });
+        }
+    }
+
+    // Now navigate to login
+    await page.goto('http://localhost:3000/');
+    await page.waitForLoadState('networkidle');
+
+    // Select Client button (plain button, not tab role)
+    await page.getByRole('button', { name: 'Client' }).click();
+
+    // Fill credentials using placeholders
+    await page.getByPlaceholder(/phone/i).fill(CLIENT_CREDENTIALS.phone);
+    await page.getByPlaceholder(/password/i).fill(CLIENT_CREDENTIALS.password);
+
+    // Submit login form
+    await page.getByRole('button', { name: /login/i }).click();
+
+    // Wait for dashboard
+    await page.waitForURL(/\/dashboard/, { timeout: 10000 });
 }
 
 // Helper to get client's job ID

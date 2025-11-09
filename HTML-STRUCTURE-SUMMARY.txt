@@ -1,0 +1,307 @@
+LAVANDARIA - ADD USER MODAL HTML STRUCTURE SUMMARY
+===================================================
+
+Source File: client/src/pages/Dashboard.js (lines 1250-1470)
+
+FORM STRUCTURE OVERVIEW
+=======================
+
+Modal Container:
+- Type: Fixed overlay div
+- Classes: fixed inset-0 bg-black bg-opacity-50
+- Inner: bg-white rounded-lg p-6 max-w-2xl w-full
+
+Form Grid:
+- Class: grid grid-cols-2 gap-3
+- Layout: 2 columns with 3px gap
+
+FIELD ACCESSIBILITY
+===================
+
+✅ All fields use proper <label> elements
+✅ Each label paired with corresponding input/select
+✅ Labels are not auto-focused (no aria-label)
+✅ No placeholder-only approach (labels provide text)
+✅ Placeholders used for hints/examples only
+
+FORM FIELDS (15 total)
+======================
+
+1. USERNAME
+   - Type: text input
+   - Label: "Username *" (required when creating)
+   - Placeholder: "Auto-generated from first and last name"
+   - Required: true (when !editingUser)
+   - ReadOnly: true (when editingUser)
+   - Background: gray-50
+   - Note: Auto-generated from First/Last name, can be edited
+   - Special behavior: Sanitizes input (removes accents/special chars)
+
+2. PASSWORD
+   - Type: password input
+   - Label: "Password *" / "Password * (leave blank to keep current)"
+   - Placeholder: "" (empty for create) or "Leave blank..." (for edit)
+   - Required: true (when !editingUser)
+   - Note: Only one password field on modal
+
+3. ROLE
+   - Type: select dropdown
+   - Label: "Role *"
+   - Options: "Master" (if isMaster), "Admin" (if isMaster/isAdmin), "Worker" (always)
+   - Required: true
+   - Disabled: true (when editingUser && editingUser.role === 'master')
+
+4. FIRST NAME
+   - Type: text input
+   - Label: "First Name *"
+   - Required: true
+   - Side effect: Changes auto-update the username
+   - Col width: 50% (paired with Last Name)
+
+5. LAST NAME
+   - Type: text input
+   - Label: "Last Name *"
+   - Required: true
+   - Side effect: Changes auto-update the username
+   - Col width: 50% (paired with First Name)
+
+6. EMAIL
+   - Type: email input
+   - Label: "Email" (no asterisk - OPTIONAL)
+   - Required: false
+   - Col width: 50% (paired with Phone)
+
+7. PHONE
+   - Type: tel input
+   - Label: "Phone *"
+   - Required: true
+   - Col width: 50% (paired with Email)
+
+8. DATE OF BIRTH
+   - Type: date input
+   - Label: "Date of Birth *"
+   - Required: true
+   - Format: yyyy-MM-dd (handled by formatDateForInput function)
+   - Col width: 50% (paired with NIF)
+
+9. NIF (TAX ID)
+   - Type: text input
+   - Label: "NIF (Tax ID) *"
+   - Placeholder: "123456789"
+   - Required: true
+   - Col width: 50% (paired with Date of Birth)
+
+10. ADDRESS LINE 1
+    - Type: text input
+    - Label: "Address Line 1 *"
+    - Placeholder: "Street name and number"
+    - Required: true
+    - Col width: 100% (full width)
+
+11. ADDRESS LINE 2
+    - Type: text input
+    - Label: "Address Line 2" (OPTIONAL - no asterisk)
+    - Placeholder: "Apartment, floor, building (optional)"
+    - Required: false
+    - Col width: 100% (full width)
+
+12. CITY
+    - Type: text input
+    - Label: "City *"
+    - Placeholder: "Lisboa, Porto, etc."
+    - Required: true
+    - Col width: 50% (paired with Postal Code)
+
+13. POSTAL CODE
+    - Type: text input
+    - Label: "Postal Code *"
+    - Placeholder: "XXXX-XXX (e.g., 1000-001)"
+    - Required: true
+    - Col width: 50% (paired with City)
+
+14. DISTRICT
+    - Type: select dropdown
+    - Label: "District" (OPTIONAL - no asterisk)
+    - Required: false
+    - First option: <option value="">Select District</option>
+    - Options: 20 Portuguese districts (Aveiro through Madeira)
+    - Col width: 50% (right side only, left empty)
+
+15. ACTIVE
+    - Type: checkbox
+    - Label: "Active (user can login)"
+    - Required: false
+    - Col width: 100% (full width)
+    - Special: Label wraps checkbox (flex layout)
+
+BUTTON ACTIONS
+==============
+
+Submit Button:
+- Text: "Create User" (when !editingUser) or "Update User" (when editingUser)
+- Type: submit
+- Submits form with handleCreateUser or handleCreateClient
+
+Cancel Button:
+- Text: "Cancel"
+- Type: button
+- Action: onClick={() => setShowUserForm(false)}
+
+REQUIRED vs OPTIONAL FIELDS
+============================
+
+ALWAYS REQUIRED (indicated by * in label):
+1. Username
+2. Password (when creating)
+3. Role
+4. First Name
+5. Last Name
+6. Phone
+7. Date of Birth
+8. NIF
+
+OPTIONAL (no * in label):
+1. Email
+2. Address Line 2
+3. District
+
+ALWAYS REQUIRED (but no asterisk shown):
+1. Address Line 1
+2. Address Line 2
+3. City
+4. Postal Code
+
+STATE MANAGEMENT
+================
+
+Form state object (userForm):
+{
+  username: '',
+  password: '',
+  role: 'worker',
+  first_name: '',
+  last_name: '',
+  email: '',
+  phone: '',
+  date_of_birth: '',
+  nif: '',
+  address_line1: '',
+  address_line2: '',
+  city: '',
+  postal_code: '',
+  district: '',
+  is_active: false
+}
+
+Edit vs Create Mode:
+- Create: All fields editable except username auto-updates
+- Edit: Username is readOnly, password optional, other fields editable
+
+HELPER FUNCTIONS
+================
+
+generateUsername(firstName, lastName):
+- Combines first/last name with sanitization
+- Called when First Name or Last Name changes
+- Updates username field automatically
+
+sanitizeUsername(username):
+- Removes accents and special characters
+- Called on every username input change
+
+formatDateForInput(dateString):
+- Converts date to yyyy-MM-dd format
+- Used to format existing user data on edit
+
+STYLING
+=======
+
+Input styling (all consistent):
+- Class: w-full px-3 py-2 border border-gray-300 rounded-lg
+- Username special: bg-gray-50
+
+Label styling (all consistent):
+- Class: block text-sm font-medium text-gray-700 mb-1
+
+Form spacing:
+- Class: space-y-4 (vertical spacing between fields)
+
+Modal max height:
+- Class: max-h-[80vh] overflow-y-auto (scrollable if content > 80vh)
+
+ACCESSIBILITY CONCERNS
+======================
+
+Current Implementation:
+✅ Uses semantic HTML labels
+✅ Labels visually associated with inputs
+❌ No aria-label attributes
+❌ No aria-describedby for helper text
+❌ No aria-invalid for error states
+❌ Placeholder text used instead of explicit descriptions
+
+Recommendations:
+1. Add aria-label to inputs that lack labels
+2. Link helper text with aria-describedby
+3. Add aria-invalid when validation fails
+4. Consider explicit aria-required for required fields
+
+STYLING CLASSES USED
+====================
+
+Tailwind Classes:
+- grid grid-cols-2 gap-3
+- col-span-2 (full width)
+- text-sm font-medium
+- text-gray-700
+- mb-1, mt-1, mb-4
+- w-full px-3 py-2
+- border border-gray-300 rounded-lg
+- bg-gray-50
+- flex items-center space-x-2
+- bg-blue-600 text-white hover:bg-blue-700
+- bg-gray-200 text-gray-700 hover:bg-gray-300
+
+FORM VALIDATION
+===============
+
+Frontend Validation:
+- HTML5 required attributes
+- Email type validation (HTML5)
+- Date type validation (HTML5)
+- No custom error messages displayed in this file
+
+Backend Validation:
+- Handled by handleCreateUser function
+- Sends POST to backend API
+- Backend returns success/error response
+
+ERROR HANDLING
+==============
+
+Not visible in the form HTML itself:
+- Error messages likely displayed via toast/snackbar
+- Success messages similarly displayed
+- Form resets on successful submission
+
+PERFORMANCE CONSIDERATIONS
+==========================
+
+Form Size: ~200 lines of JSX
+- Not a huge form, loads quickly
+- Grid layout is performant
+- No heavy components nested
+
+Input Handlers:
+- onChange for all fields
+- Auto-generation for username (potentially expensive)
+- Sanitization on username input
+
+Modal Performance:
+- Fixed positioning (overlays page)
+- Reasonable padding and max-width
+- Overflow scrolling for mobile/small screens
+
+===================================================
+Last Updated: 2025-11-09
+Reference: docs/ADD-USER-MODAL-STRUCTURE.md
