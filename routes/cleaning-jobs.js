@@ -222,7 +222,7 @@ router.get('/:id/full', requireAuth, async (req, res) => {
         const jobResult = await pool.query(
             `SELECT cj.*,
                     c.full_name as client_name, c.phone as client_phone, c.email as client_email,
-                    c.address as client_address,
+                    c.address_line1 as client_address,
                     u.full_name as worker_name,
                     creator.full_name as created_by_name
              FROM cleaning_jobs cj

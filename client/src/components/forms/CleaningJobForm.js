@@ -2,11 +2,22 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const CleaningJobForm = ({ onSuccess, onCancel, editJob = null, clients = [], workers = [] }) => {
+  // Helper: Convert ISO date to yyyy-MM-dd format
+  const formatDateForInput = (isoDate) => {
+    if (!isoDate) return '';
+    try {
+      const date = new Date(isoDate);
+      return date.toISOString().split('T')[0]; // "2025-11-11"
+    } catch {
+      return '';
+    }
+  };
+
   const [formData, setFormData] = useState({
     client_id: editJob?.client_id || '',
     job_type: editJob?.job_type || 'house',
     address: editJob?.address || '',
-    scheduled_date: editJob?.scheduled_date || '',
+    scheduled_date: formatDateForInput(editJob?.scheduled_date) || '',
     scheduled_time: editJob?.scheduled_time || '',
     assigned_worker_id: editJob?.assigned_worker_id || '',
     status: editJob?.status || 'scheduled'
@@ -25,7 +36,13 @@ const CleaningJobForm = ({ onSuccess, onCancel, editJob = null, clients = [], wo
         : '/api/cleaning-jobs';
       const method = editJob ? 'put' : 'post';
 
-      const response = await axios[method](endpoint, formData);
+      // Convert empty strings to null for optional fields
+      const payload = {
+        ...formData,
+        assigned_worker_id: formData.assigned_worker_id || null
+      };
+
+      const response = await axios[method](endpoint, payload);
 
       if (response.data.success) {
         console.log(`✅ Job ${editJob ? 'updated' : 'created'} with correlation ID:`, response.data._meta.correlationId);
