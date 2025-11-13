@@ -56,9 +56,11 @@ router.get('/', requireAuth, async (req, res) => {
             query = `
                 SELECT cj.*,
                        c.name as client_name, c.phone as client_phone,
-                       u.name as worker_name
+                       u.name as worker_name,
+                       p.property_name, p.address_line1, p.city, p.postal_code
                 FROM cleaning_jobs cj
                 JOIN clients c ON cj.client_id = c.id
+                JOIN properties p ON cj.property_id = p.id
                 LEFT JOIN users u ON cj.assigned_worker_id = u.id
                 ORDER BY cj.scheduled_date ${order}, cj.scheduled_time ${order}
                 LIMIT $1 OFFSET $2
@@ -70,9 +72,11 @@ router.get('/', requireAuth, async (req, res) => {
             countParams = [req.session.userId];
             query = `
                 SELECT cj.*,
-                       c.name as client_name, c.phone as client_phone
+                       c.name as client_name, c.phone as client_phone,
+                       p.property_name, p.address_line1, p.city, p.postal_code
                 FROM cleaning_jobs cj
                 JOIN clients c ON cj.client_id = c.id
+                JOIN properties p ON cj.property_id = p.id
                 WHERE cj.assigned_worker_id = $1
                 ORDER BY cj.scheduled_date ${order}, cj.scheduled_time ${order}
                 LIMIT $2 OFFSET $3
@@ -84,8 +88,10 @@ router.get('/', requireAuth, async (req, res) => {
             countParams = [req.session.clientId];
             query = `
                 SELECT cj.*,
-                       u.name as worker_name
+                       u.name as worker_name,
+                       p.property_name, p.address_line1, p.city, p.postal_code
                 FROM cleaning_jobs cj
+                JOIN properties p ON cj.property_id = p.id
                 LEFT JOIN users u ON cj.assigned_worker_id = u.id
                 WHERE cj.client_id = $1
                 ORDER BY cj.scheduled_date ${order}, cj.scheduled_time ${order}
@@ -124,9 +130,13 @@ router.get('/:id', requireAuth, async (req, res) => {
         const jobResult = await pool.query(
             `SELECT cj.*,
                     c.name as client_name, c.phone as client_phone, c.email as client_email,
-                    u.name as worker_name
+                    u.name as worker_name,
+                    p.property_name, p.address_line1, p.address_line2, p.city, p.postal_code, p.district,
+                    pt.type_name as property_type
              FROM cleaning_jobs cj
              JOIN clients c ON cj.client_id = c.id
+             JOIN properties p ON cj.property_id = p.id
+             LEFT JOIN property_types pt ON p.property_type_id = pt.id
              LEFT JOIN users u ON cj.assigned_worker_id = u.id
              WHERE cj.id = $1`,
             [req.params.id]
@@ -222,11 +232,14 @@ router.get('/:id/full', requireAuth, async (req, res) => {
         const jobResult = await pool.query(
             `SELECT cj.*,
                     c.name as client_name, c.phone as client_phone, c.email as client_email,
-                    c.address_line1 as client_address,
                     u.name as worker_name,
-                    creator.full_name as created_by_name
+                    creator.name as created_by_name,
+                    p.property_name, p.address_line1, p.address_line2, p.city, p.postal_code, p.district,
+                    pt.type_name as property_type
              FROM cleaning_jobs cj
              JOIN clients c ON cj.client_id = c.id
+             JOIN properties p ON cj.property_id = p.id
+             LEFT JOIN property_types pt ON p.property_type_id = pt.id
              LEFT JOIN users u ON cj.assigned_worker_id = u.id
              LEFT JOIN users creator ON cj.created_by = creator.id
              WHERE cj.id = $1`,
@@ -304,26 +317,36 @@ router.get('/:id/full', requireAuth, async (req, res) => {
 });
 
 // ==============================================
-// CREATE CLEANING JOB (Master/Admin only)
+// CREATE CLEANING JOB (Master/Admin only) - V2 with property_id
 // ==============================================
 router.post('/', requireMasterOrAdmin, async (req, res) => {
     const {
-        client_id, job_type, property_name, address_line1, address_line2,
-        city, postal_code, district, country, scheduled_date, scheduled_time,
+        client_id, property_id, job_type, scheduled_date, scheduled_time,
         assigned_worker_ids, estimated_hours, hourly_rate, special_instructions, notes
     } = req.body;
 
-    console.log('🧹 [CLEANING JOB] Creating new cleaning job...');
+    console.log('🧹 [CLEANING JOB] Creating new cleaning job (V2)...');
     console.log('📋 [CLEANING JOB] Request body:', JSON.stringify(req.body, null, 2));
     console.log('👤 [CLEANING JOB] User session:', { userId: req.session.userId, userType: req.session.userType });
 
     try {
-        // Build full property address
-        const property_address = property_name
-            ? `${property_name}, ${address_line1}`
-            : address_line1;
+        // Validate required fields
+        if (!client_id || !property_id || !job_type || !scheduled_date || !scheduled_time) {
+            return res.status(400).json({
+                error: 'Missing required fields: client_id, property_id, job_type, scheduled_date, scheduled_time'
+            });
+        }
 
-        console.log('🏠 [CLEANING JOB] Property address built:', property_address);
+        // Verify property belongs to client
+        const propertyCheck = await pool.query(
+            'SELECT id FROM properties WHERE id = $1 AND client_id = $2',
+            [property_id, client_id]
+        );
+
+        if (propertyCheck.rows.length === 0) {
+            console.log(`❌ [CLEANING JOB] Property ${property_id} does not belong to client ${client_id}`);
+            return res.status(400).json({ error: 'Property does not belong to client' });
+        }
 
         // Parse worker IDs (can be array or single value)
         let workerIds = [];
@@ -344,17 +367,15 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
 
         const result = await pool.query(
             `INSERT INTO cleaning_jobs (
-                client_id, job_type, property_name, property_address,
-                address_line1, address_line2, city, postal_code, district, country,
-                scheduled_date, scheduled_time, assigned_worker_id, estimated_hours,
-                hourly_rate, special_instructions, notes, created_by
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+                client_id, property_id, job_type, scheduled_date, scheduled_time,
+                assigned_worker_id, estimated_hours, hourly_rate,
+                special_instructions, notes, created_by
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *`,
             [
-                client_id, job_type, property_name, property_address,
-                address_line1, address_line2, city, postal_code, district, country || 'Portugal',
-                scheduled_date, scheduled_time, primary_worker_id, estimated_hours,
-                hourly_rate || 15.00, special_instructions, notes, req.session.userId
+                client_id, property_id, job_type, scheduled_date, scheduled_time,
+                primary_worker_id, estimated_hours, hourly_rate || 15.00,
+                special_instructions, notes, req.session.userId
             ]
         );
 
@@ -376,7 +397,21 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
             }
         }
 
-        res.status(201).json(result.rows[0]);
+        // Fetch job with property details for response
+        const fullJobResult = await pool.query(
+            `SELECT cj.*,
+                    c.name as client_name,
+                    p.property_name, p.address_line1, p.city,
+                    u.name as worker_name
+             FROM cleaning_jobs cj
+             JOIN clients c ON cj.client_id = c.id
+             JOIN properties p ON cj.property_id = p.id
+             LEFT JOIN users u ON cj.assigned_worker_id = u.id
+             WHERE cj.id = $1`,
+            [jobId]
+        );
+
+        res.status(201).json(fullJobResult.rows[0]);
     } catch (error) {
         console.error('💥 [CLEANING JOB] Error creating cleaning job:', error);
         console.error('💥 [CLEANING JOB] Error details:', {
@@ -390,13 +425,12 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
 });
 
 // ==============================================
-// UPDATE CLEANING JOB (Master/Admin only)
+// UPDATE CLEANING JOB (Master/Admin only) - V2 with property_id
 // ==============================================
 router.put('/:id', requireMasterOrAdmin, async (req, res) => {
     const {
-        client_id, job_type, property_name, address_line1, address_line2,
-        city, postal_code, district, country, scheduled_date, scheduled_time, assigned_worker_id,
-        hourly_rate, status, payment_status, special_instructions, notes
+        client_id, property_id, job_type, scheduled_date, scheduled_time, assigned_worker_id,
+        hourly_rate, estimated_hours, status, payment_status, special_instructions, notes
     } = req.body;
 
     try {
@@ -411,47 +445,62 @@ router.put('/:id', requireMasterOrAdmin, async (req, res) => {
 
         // Use provided values or fall back to current values
         const updatedClientId = client_id !== undefined ? client_id : current.client_id;
+        const updatedPropertyId = property_id !== undefined ? property_id : current.property_id;
         const updatedJobType = job_type !== undefined ? job_type : current.job_type;
-        const updatedPropertyName = property_name !== undefined ? property_name : current.property_name;
-        const updatedAddressLine1 = address_line1 !== undefined ? address_line1 : current.address_line1;
-        const updatedAddressLine2 = address_line2 !== undefined ? address_line2 : current.address_line2;
-        const updatedCity = city !== undefined ? city : current.city;
-        const updatedPostalCode = postal_code !== undefined ? postal_code : current.postal_code;
-        const updatedDistrict = district !== undefined ? district : current.district;
-        const updatedCountry = country !== undefined ? country : (current.country || 'Portugal');
         const updatedScheduledDate = scheduled_date !== undefined ? scheduled_date : current.scheduled_date;
         const updatedScheduledTime = scheduled_time !== undefined ? scheduled_time : current.scheduled_time;
         const updatedAssignedWorkerId = assigned_worker_id !== undefined ? assigned_worker_id : current.assigned_worker_id;
         const updatedHourlyRate = hourly_rate !== undefined ? hourly_rate : current.hourly_rate;
+        const updatedEstimatedHours = estimated_hours !== undefined ? estimated_hours : current.estimated_hours;
         const updatedStatus = status !== undefined ? status : current.status;
         const updatedPaymentStatus = payment_status !== undefined ? payment_status : current.payment_status;
         const updatedSpecialInstructions = special_instructions !== undefined ? special_instructions : current.special_instructions;
         const updatedNotes = notes !== undefined ? notes : current.notes;
 
-        const property_address = updatedPropertyName
-            ? `${updatedPropertyName}, ${updatedAddressLine1}`
-            : updatedAddressLine1;
+        // If property_id is being changed, verify it belongs to the client
+        if (property_id !== undefined && property_id !== current.property_id) {
+            const propertyCheck = await pool.query(
+                'SELECT id FROM properties WHERE id = $1 AND client_id = $2',
+                [updatedPropertyId, updatedClientId]
+            );
+
+            if (propertyCheck.rows.length === 0) {
+                return res.status(400).json({ error: 'Property does not belong to client' });
+            }
+        }
 
         const result = await pool.query(
             `UPDATE cleaning_jobs SET
-                client_id = $1, job_type = $2, property_name = $3, property_address = $4,
-                address_line1 = $5, address_line2 = $6, city = $7, postal_code = $8, district = $9, country = $10,
-                scheduled_date = $11, scheduled_time = $12, assigned_worker_id = $13,
-                hourly_rate = $14, status = $15, payment_status = $16,
-                special_instructions = $17, notes = $18
-             WHERE id = $19
+                client_id = $1, property_id = $2, job_type = $3,
+                scheduled_date = $4, scheduled_time = $5, assigned_worker_id = $6,
+                hourly_rate = $7, estimated_hours = $8, status = $9, payment_status = $10,
+                special_instructions = $11, notes = $12, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $13
              RETURNING *`,
             [
-                updatedClientId, updatedJobType, updatedPropertyName, property_address,
-                updatedAddressLine1, updatedAddressLine2, updatedCity, updatedPostalCode, updatedDistrict, updatedCountry,
+                updatedClientId, updatedPropertyId, updatedJobType,
                 updatedScheduledDate, updatedScheduledTime, updatedAssignedWorkerId,
-                updatedHourlyRate, updatedStatus, updatedPaymentStatus,
+                updatedHourlyRate, updatedEstimatedHours, updatedStatus, updatedPaymentStatus,
                 updatedSpecialInstructions, updatedNotes,
                 req.params.id
             ]
         );
 
-        res.json(result.rows[0]);
+        // Fetch updated job with property details for response
+        const fullJobResult = await pool.query(
+            `SELECT cj.*,
+                    c.name as client_name,
+                    p.property_name, p.address_line1, p.city,
+                    u.name as worker_name
+             FROM cleaning_jobs cj
+             JOIN clients c ON cj.client_id = c.id
+             JOIN properties p ON cj.property_id = p.id
+             LEFT JOIN users u ON cj.assigned_worker_id = u.id
+             WHERE cj.id = $1`,
+            [req.params.id]
+        );
+
+        res.json(fullJobResult.rows[0]);
     } catch (error) {
         console.error('Error updating job:', error);
         res.status(500).json({ error: 'Server error' });
