@@ -1,9 +1,11 @@
 -- ==============================================
--- Lavandaria PostgreSQL Database Schema v2.0 (SIMPLIFIED)
+-- Lavandaria PostgreSQL Database Schema (COMPLETE)
 -- ==============================================
--- SINGLE SOURCE OF TRUTH - Simplified for Portugal-only operations
--- Date: 2025-11-09
--- Purpose: Streamlined dual-business system with property-based workflow
+-- This is the SINGLE SOURCE OF TRUTH for development
+-- No migration files needed - this creates everything from scratch
+--
+-- Date: 2025-10-21
+-- Purpose: Complete database schema for Lavandaria dual-business system
 -- ==============================================
 
 -- Enable UUID extension
@@ -22,51 +24,16 @@ CREATE TABLE IF NOT EXISTS "session" (
 CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
 
 -- ==============================================
--- ROLE TYPES (Lookup table for user roles)
--- ==============================================
-CREATE TABLE role_types (
-    id SERIAL PRIMARY KEY,
-    role_name VARCHAR(20) UNIQUE NOT NULL CHECK (role_name IN ('master', 'admin', 'worker')),
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Insert role types
-INSERT INTO role_types (role_name, description) VALUES
-('master', 'System owner with full access'),
-('admin', 'Manager with admin privileges'),
-('worker', 'Field worker for jobs and orders')
-ON CONFLICT (role_name) DO NOTHING;
-
--- ==============================================
--- PROPERTY TYPES (Lookup table for property categories)
--- ==============================================
-CREATE TABLE property_types (
-    id SERIAL PRIMARY KEY,
-    type_name VARCHAR(50) UNIQUE NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Insert property types
-INSERT INTO property_types (type_name, description) VALUES
-('casa', 'House/Home'),
-('apartamento', 'Apartment'),
-('quinta', 'Farm/Estate'),
-('escritorio', 'Office'),
-('loja', 'Shop/Store'),
-('outro', 'Other')
-ON CONFLICT (type_name) DO NOTHING;
-
--- ==============================================
 -- USERS (Staff: master, admin, worker)
 -- ==============================================
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role_id INTEGER NOT NULL REFERENCES role_types(id) ON DELETE RESTRICT,
-    name VARCHAR(100) NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('master', 'admin', 'worker')),
+    full_name VARCHAR(100) NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
     email VARCHAR(100),
     phone VARCHAR(20),
     date_of_birth DATE,
@@ -76,15 +43,13 @@ CREATE TABLE users (
     city VARCHAR(100),
     postal_code VARCHAR(20),
     district VARCHAR(100),
+    country VARCHAR(100) DEFAULT 'Portugal',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
     created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
-
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_role ON users(role_id);
-CREATE INDEX idx_users_is_active ON users(is_active);
 
 -- ==============================================
 -- CLIENTS (Customers)
@@ -93,61 +58,62 @@ CREATE TABLE clients (
     id SERIAL PRIMARY KEY,
     phone VARCHAR(20) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    name VARCHAR(100) NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
     email VARCHAR(100),
     date_of_birth DATE,
     nif VARCHAR(20),
+    address_line1 VARCHAR(200),
+    address_line2 VARCHAR(200),
+    city VARCHAR(100),
+    postal_code VARCHAR(20),
+    district VARCHAR(100),
+    country VARCHAR(100) DEFAULT 'Portugal',
     notes TEXT,
     is_enterprise BOOLEAN DEFAULT FALSE,
     company_name VARCHAR(200),
+    registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
-    must_change_password BOOLEAN DEFAULT TRUE,
-    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+    must_change_password BOOLEAN DEFAULT TRUE
 );
-
-CREATE INDEX idx_clients_phone ON clients(phone);
-CREATE INDEX idx_clients_is_active ON clients(is_active);
-CREATE INDEX idx_clients_is_enterprise ON clients(is_enterprise);
 
 -- ==============================================
 -- PROPERTIES (Client addresses for services)
 -- ==============================================
--- Workflow: Client → Properties → Cleaning Jobs
--- A client can have multiple properties (10+ addresses)
--- When creating cleaning job, select client first, then property
 CREATE TABLE properties (
     id SERIAL PRIMARY KEY,
     client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    property_name VARCHAR(200),
+    name VARCHAR(200),
     address_line1 VARCHAR(200) NOT NULL,
     address_line2 VARCHAR(200),
     city VARCHAR(100) NOT NULL,
     postal_code VARCHAR(20),
     district VARCHAR(100),
-    property_type_id INTEGER REFERENCES property_types(id) ON DELETE SET NULL,
+    country VARCHAR(100) DEFAULT 'Portugal',
+    property_type VARCHAR(50),
     access_instructions TEXT,
     is_primary BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_properties_client ON properties(client_id);
-CREATE INDEX idx_properties_type ON properties(property_type_id);
-CREATE INDEX idx_properties_is_primary ON properties(is_primary);
 
 -- ==============================================
 -- CLEANING JOBS (Airbnb & Houses)
 -- ==============================================
--- Uses property_id instead of direct address
--- Select client → shows only that client's properties
 CREATE TABLE cleaning_jobs (
     id SERIAL PRIMARY KEY,
     client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
     assigned_worker_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     job_type VARCHAR(20) NOT NULL CHECK (job_type IN ('airbnb', 'house')),
+    property_name VARCHAR(200),
+    property_address TEXT NOT NULL,
+    address_line1 VARCHAR(200) NOT NULL,
+    address_line2 VARCHAR(200),
+    city VARCHAR(100) NOT NULL,
+    postal_code VARCHAR(20),
+    district VARCHAR(100),
+    country VARCHAR(100) DEFAULT 'Portugal',
     scheduled_date DATE NOT NULL,
     scheduled_time TIME NOT NULL,
     estimated_hours DECIMAL(5,2),
@@ -160,18 +126,22 @@ CREATE TABLE cleaning_jobs (
         CHECK (status IN ('scheduled', 'in_progress', 'completed', 'cancelled')),
     payment_status VARCHAR(20) DEFAULT 'pending'
         CHECK (payment_status IN ('pending', 'paid', 'partial')),
+    payment_method VARCHAR(50),
+    paid_amount DECIMAL(10,2) DEFAULT 0,
     notes TEXT,
     special_instructions TEXT,
     client_feedback TEXT,
-    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    client_rating INTEGER CHECK (client_rating >= 1 AND client_rating <= 5),
+    created_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMP,
-    client_viewed_photos BOOLEAN DEFAULT FALSE
+    push_notification_sent BOOLEAN DEFAULT FALSE,
+    client_viewed_photos BOOLEAN DEFAULT FALSE,
+    last_synced_at TIMESTAMP
 );
 
 CREATE INDEX idx_cleaning_jobs_client ON cleaning_jobs(client_id);
-CREATE INDEX idx_cleaning_jobs_property ON cleaning_jobs(property_id);
 CREATE INDEX idx_cleaning_jobs_worker ON cleaning_jobs(assigned_worker_id);
 CREATE INDEX idx_cleaning_jobs_status ON cleaning_jobs(status);
 CREATE INDEX idx_cleaning_jobs_date ON cleaning_jobs(scheduled_date);
@@ -222,11 +192,11 @@ CREATE TABLE cleaning_job_photos (
     worker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     photo_url VARCHAR(500) NOT NULL,
     photo_type VARCHAR(20) NOT NULL CHECK (photo_type IN ('before', 'after', 'detail')),
+    room_area VARCHAR(100),
     thumbnail_url VARCHAR(500),
     file_size_kb INTEGER,
     original_filename VARCHAR(255),
     caption TEXT,
-    room_area VARCHAR(100),
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     viewed_by_client BOOLEAN DEFAULT FALSE,
     viewed_at TIMESTAMP
@@ -234,7 +204,6 @@ CREATE TABLE cleaning_job_photos (
 
 CREATE INDEX idx_photos_job ON cleaning_job_photos(cleaning_job_id);
 CREATE INDEX idx_photos_type ON cleaning_job_photos(photo_type);
-CREATE INDEX idx_photos_worker ON cleaning_job_photos(worker_id);
 
 -- ==============================================
 -- LAUNDRY SERVICES (Service catalog with pricing)
@@ -251,9 +220,6 @@ CREATE TABLE laundry_services (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_laundry_services_type ON laundry_services(service_type);
-CREATE INDEX idx_laundry_services_active ON laundry_services(is_active);
 
 -- ==============================================
 -- LAUNDRY ORDERS
@@ -274,19 +240,24 @@ CREATE TABLE laundry_orders_new (
         CHECK (status IN ('received', 'in_progress', 'ready', 'collected', 'cancelled')),
     payment_status VARCHAR(20) DEFAULT 'pending'
         CHECK (payment_status IN ('pending', 'paid', 'partial')),
+    payment_method VARCHAR(50),
+    paid_amount DECIMAL(10,2) DEFAULT 0,
     received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ready_at TIMESTAMP,
     collected_at TIMESTAMP,
     expected_ready_date DATE,
     ready_notification_sent BOOLEAN DEFAULT FALSE,
     ready_notification_sent_at TIMESTAMP,
+    client_notified_via VARCHAR(50),
     special_instructions TEXT,
     internal_notes TEXT,
     client_feedback TEXT,
     client_rating INTEGER CHECK (client_rating >= 1 AND client_rating <= 5),
-    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    push_notification_sent BOOLEAN DEFAULT FALSE,
+    last_synced_at TIMESTAMP
 );
 
 CREATE INDEX idx_laundry_orders_client ON laundry_orders_new(client_id);
@@ -316,48 +287,40 @@ CREATE INDEX idx_laundry_items_order ON laundry_order_items(laundry_order_id);
 CREATE INDEX idx_laundry_items_type ON laundry_order_items(item_type);
 
 -- ==============================================
--- PAYMENTS - UNIFIED TABLE
+-- PAYMENTS - SPLIT TABLES FOR FK INTEGRITY
 -- ==============================================
--- Single payments table for both services
--- service_type determines if cleaning or laundry
--- Tax is flexible per receipt (master/admin can change)
-CREATE TABLE payments (
+
+-- Payments for cleaning jobs
+CREATE TABLE payments_cleaning (
     id SERIAL PRIMARY KEY,
+    cleaning_job_id INTEGER NOT NULL REFERENCES cleaning_jobs(id) ON DELETE CASCADE,
     client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-
-    -- Service discrimination (one will be NULL)
-    service_type VARCHAR(20) NOT NULL CHECK (service_type IN ('cleaning', 'laundry')),
-    cleaning_job_id INTEGER REFERENCES cleaning_jobs(id) ON DELETE CASCADE,
-    laundry_order_id INTEGER REFERENCES laundry_orders_new(id) ON DELETE CASCADE,
-
-    -- Payment details
     amount DECIMAL(10,2) NOT NULL,
     payment_method VARCHAR(20) NOT NULL CHECK (payment_method IN ('cash', 'card', 'transfer', 'mbway', 'other')),
     payment_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    -- Tax handling (flexible per receipt)
-    -- Client always pays same amount, tax % can vary for accounting
-    tax_percentage DECIMAL(5,2) NOT NULL DEFAULT 23.00, -- IVA 23% (Portugal standard)
-    tax_amount DECIMAL(10,2) NOT NULL, -- Auto-calculated
-    amount_before_tax DECIMAL(10,2) NOT NULL, -- Auto-calculated
-
     notes TEXT,
-    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    -- Ensure only one service FK is set
-    CONSTRAINT check_single_service CHECK (
-        (service_type = 'cleaning' AND cleaning_job_id IS NOT NULL AND laundry_order_id IS NULL) OR
-        (service_type = 'laundry' AND laundry_order_id IS NOT NULL AND cleaning_job_id IS NULL)
-    )
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_payments_client ON payments(client_id);
-CREATE INDEX idx_payments_service_type ON payments(service_type);
-CREATE INDEX idx_payments_cleaning_job ON payments(cleaning_job_id);
-CREATE INDEX idx_payments_laundry_order ON payments(laundry_order_id);
-CREATE INDEX idx_payments_date ON payments(payment_date);
-CREATE INDEX idx_payments_method ON payments(payment_method);
+CREATE INDEX idx_payments_cleaning_job ON payments_cleaning(cleaning_job_id);
+CREATE INDEX idx_payments_cleaning_client ON payments_cleaning(client_id);
+CREATE INDEX idx_payments_cleaning_date ON payments_cleaning(payment_date);
+
+-- Payments for laundry orders
+CREATE TABLE payments_laundry (
+    id SERIAL PRIMARY KEY,
+    laundry_order_id INTEGER NOT NULL REFERENCES laundry_orders_new(id) ON DELETE CASCADE,
+    client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    amount DECIMAL(10,2) NOT NULL,
+    payment_method VARCHAR(20) NOT NULL CHECK (payment_method IN ('cash', 'card', 'transfer', 'mbway', 'other')),
+    payment_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_payments_laundry_order ON payments_laundry(laundry_order_id);
+CREATE INDEX idx_payments_laundry_client ON payments_laundry(client_id);
+CREATE INDEX idx_payments_laundry_date ON payments_laundry(payment_date);
 
 -- ==============================================
 -- TICKETS (Worker issue reporting)
@@ -366,9 +329,8 @@ CREATE TABLE tickets (
     id SERIAL PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
     description TEXT NOT NULL,
-    service_type VARCHAR(20) CHECK (service_type IN ('laundry', 'cleaning', 'general')),
-    cleaning_job_id INTEGER REFERENCES cleaning_jobs(id) ON DELETE SET NULL,
-    laundry_order_id INTEGER REFERENCES laundry_orders_new(id) ON DELETE SET NULL,
+    order_type VARCHAR(20) CHECK (order_type IN ('laundry', 'cleaning', 'general')),
+    order_id INTEGER,
     priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
     status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
     created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -383,10 +345,9 @@ CREATE TABLE tickets (
 CREATE INDEX idx_tickets_status ON tickets(status);
 CREATE INDEX idx_tickets_created_by ON tickets(created_by);
 CREATE INDEX idx_tickets_assigned_to ON tickets(assigned_to);
-CREATE INDEX idx_tickets_service_type ON tickets(service_type);
 
 -- ==============================================
--- JOB NOTIFICATIONS (for client alerts)
+-- JOB NOTIFICATIONS (for mobile apps)
 -- ==============================================
 CREATE TABLE job_notifications (
     id SERIAL PRIMARY KEY,
@@ -408,6 +369,8 @@ CREATE TABLE job_notifications (
     read_at TIMESTAMP,
     status VARCHAR(20) DEFAULT 'pending'
         CHECK (status IN ('pending', 'sent', 'delivered', 'read', 'failed')),
+    push_token TEXT,
+    deep_link VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -415,6 +378,15 @@ CREATE INDEX idx_notifications_user ON job_notifications(user_id);
 CREATE INDEX idx_notifications_client ON job_notifications(client_id);
 CREATE INDEX idx_notifications_status ON job_notifications(status);
 CREATE INDEX idx_notifications_type ON job_notifications(notification_type);
+
+-- ==============================================
+-- INDEXES FOR PERFORMANCE
+-- ==============================================
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_clients_phone ON clients(phone);
+CREATE INDEX IF NOT EXISTS idx_clients_is_active ON clients(is_active);
+CREATE INDEX IF NOT EXISTS idx_properties_client ON properties(client_id);
 
 -- ==============================================
 -- TRIGGERS FOR AUTO-UPDATES
@@ -433,34 +405,6 @@ CREATE TRIGGER trigger_update_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION update_users_updated_at();
-
--- Auto-update updated_at for clients
-CREATE OR REPLACE FUNCTION update_clients_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_update_clients_updated_at
-    BEFORE UPDATE ON clients
-    FOR EACH ROW
-    EXECUTE FUNCTION update_clients_updated_at();
-
--- Auto-update updated_at for properties
-CREATE OR REPLACE FUNCTION update_properties_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_update_properties_updated_at
-    BEFORE UPDATE ON properties
-    FOR EACH ROW
-    EXECUTE FUNCTION update_properties_updated_at();
 
 -- Auto-update updated_at for cleaning_jobs
 CREATE OR REPLACE FUNCTION update_cleaning_jobs_updated_at()
@@ -524,24 +468,6 @@ CREATE TRIGGER trigger_calculate_laundry_total
     FOR EACH ROW
     EXECUTE FUNCTION calculate_laundry_total();
 
--- Auto-calculate payment tax amounts
-CREATE OR REPLACE FUNCTION calculate_payment_tax()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- Calculate amount before tax and tax amount based on tax percentage
-    -- Formula: amount_before_tax = amount / (1 + tax_percentage/100)
-    -- tax_amount = amount - amount_before_tax
-    NEW.amount_before_tax = NEW.amount / (1 + (NEW.tax_percentage / 100));
-    NEW.tax_amount = NEW.amount - NEW.amount_before_tax;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_calculate_payment_tax
-    BEFORE INSERT OR UPDATE ON payments
-    FOR EACH ROW
-    EXECUTE FUNCTION calculate_payment_tax();
-
 -- ==============================================
 -- SEED DATA (for development/testing)
 -- ==============================================
@@ -550,24 +476,18 @@ CREATE TRIGGER trigger_calculate_payment_tax
 -- Master: password = master123
 -- Admin: password = admin123
 -- Worker: password = worker123
-INSERT INTO users (username, password, role_id, name, email) VALUES
-('master', '$2b$10$iyoWMyQRwUrseBPEUOvu6.9xMRJ4d6RCjIbfv/OpollcbeMQWiU.e', 1, 'Master Admin', 'master@lavandaria.com'),
-('admin', '$2b$10$AC7dVLo.KeW3YgIeveZ9C.Dy/qmDxQhoDtvf0Q2vW2k/EZyy8uNEy', 2, 'Administrator', 'admin@lavandaria.com'),
-('worker1', '$2b$10$5TBBvMz.csBeXlp/isBgnuMi8xlMGywuot8VUxN5QaP5Qz7ELYZJW', 3, 'Maria Silva', NULL)
+INSERT INTO users (username, password, role, full_name, first_name, last_name, email) VALUES
+('master', '$2b$10$iyoWMyQRwUrseBPEUOvu6.9xMRJ4d6RCjIbfv/OpollcbeMQWiU.e', 'master', 'Master Admin', 'Master', 'Admin', 'master@lavandaria.com'),
+('admin', '$2b$10$AC7dVLo.KeW3YgIeveZ9C.Dy/qmDxQhoDtvf0Q2vW2k/EZyy8uNEy', 'admin', 'Administrator', 'Administrator', '', 'admin@lavandaria.com'),
+('worker1', '$2b$10$5TBBvMz.csBeXlp/isBgnuMi8xlMGywuot8VUxN5QaP5Qz7ELYZJW', 'worker', 'Maria Silva', 'Maria', 'Silva', NULL)
 ON CONFLICT (username) DO NOTHING;
 
 UPDATE users SET created_by = 1 WHERE username IN ('admin', 'worker1');
 
 -- Insert sample client
-INSERT INTO clients (phone, password, name, email, notes) VALUES
-('911111111', '$2b$10$XYjLzqW8K9H.eN6D9h3.8OZN.q7K6r3zv3fV3d7N.H8K9XYjLzqW8K', 'João Santos', 'joao@example.com', 'Sample client for testing')
+INSERT INTO clients (phone, password, full_name, first_name, last_name, email, notes) VALUES
+('911111111', '$2b$10$XYjLzqW8K9H.eN6D9h3.8OZN.q7K6r3zv3fV3d7N.H8K9XYjLzqW8K', 'João Santos', 'João', 'Santos', 'joao@example.com', 'Sample client for testing')
 ON CONFLICT (phone) DO NOTHING;
-
--- Insert sample properties for client
-INSERT INTO properties (client_id, property_name, address_line1, city, postal_code, property_type_id, is_primary) VALUES
-(1, 'Casa Principal', 'Rua das Flores, 123', 'Lisboa', '1100-123', 1, TRUE),
-(1, 'Apartamento Airbnb', 'Av. da Liberdade, 456', 'Lisboa', '1200-456', 2, FALSE)
-ON CONFLICT DO NOTHING;
 
 -- Insert laundry services
 INSERT INTO laundry_services (name, service_type, base_price, unit, estimated_duration_minutes, description) VALUES
@@ -585,24 +505,26 @@ INSERT INTO laundry_services (name, service_type, base_price, unit, estimated_du
 ('Alterations', 'special', 10.00, 'item', NULL, 'Basic clothing alterations')
 ON CONFLICT DO NOTHING;
 
+-- Insert sample laundry orders
+INSERT INTO laundry_orders_new (client_id, order_number, order_type, total_weight_kg, base_price, total_price, status, created_by) VALUES
+(1, 'LDR-' || TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDD') || '-001', 'bulk_kg', 5.5, 19.25, 19.25, 'received', 1),
+(1, 'LDR-' || TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDD') || '-002', 'itemized', 0, 21.00, 21.00, 'received', 1)
+ON CONFLICT (order_number) DO NOTHING;
+
+-- Insert sample cleaning job
+INSERT INTO cleaning_jobs (client_id, job_type, property_address, address_line1, city, scheduled_date, scheduled_time, status, created_by) VALUES
+(1, 'airbnb', 'Apartment 12B, Rua das Flores', 'Rua das Flores, 123', 'Lisboa', CURRENT_DATE + INTERVAL '2 days', '10:00:00', 'scheduled', 1)
+ON CONFLICT DO NOTHING;
+
 -- ==============================================
 -- COMMENTS FOR DOCUMENTATION
 -- ==============================================
-COMMENT ON TABLE users IS 'Staff users: master, admin, worker (role via role_types FK)';
-COMMENT ON TABLE clients IS 'Customer accounts (Portugal-only, simplified addressing)';
-COMMENT ON TABLE properties IS 'Client properties for cleaning services (one client, many properties)';
-COMMENT ON TABLE property_types IS 'Lookup table for property categories (casa, apartamento, quinta, etc.)';
-COMMENT ON TABLE role_types IS 'Lookup table for user roles (master, admin, worker)';
-COMMENT ON TABLE cleaning_jobs IS 'Cleaning jobs linked to properties (select client → shows their properties)';
+COMMENT ON TABLE cleaning_jobs IS 'Airbnb and house cleaning jobs with time tracking';
 COMMENT ON TABLE cleaning_time_logs IS 'Time tracking logs for billing accuracy';
 COMMENT ON TABLE cleaning_job_photos IS 'Before/after photos for client viewing';
 COMMENT ON TABLE laundry_orders_new IS 'Laundry orders supporting bulk, itemized, and house bundles';
 COMMENT ON TABLE laundry_order_items IS 'Individual items in laundry orders';
-COMMENT ON TABLE payments IS 'Unified payments table for both cleaning and laundry services with flexible tax handling';
-COMMENT ON TABLE job_notifications IS 'Notification system for client alerts';
-COMMENT ON TABLE tickets IS 'Worker issue reporting system';
+COMMENT ON TABLE payments_cleaning IS 'Payments for cleaning jobs with FK to cleaning_jobs';
+COMMENT ON TABLE payments_laundry IS 'Payments for laundry orders with FK to laundry_orders_new';
+COMMENT ON TABLE job_notifications IS 'Notification system for mobile apps and SMS/email';
 
-COMMENT ON COLUMN payments.tax_percentage IS 'Tax percentage for this receipt (default 23% IVA, master/admin can change per receipt)';
-COMMENT ON COLUMN payments.tax_amount IS 'Auto-calculated tax amount (updated by trigger)';
-COMMENT ON COLUMN payments.amount_before_tax IS 'Auto-calculated amount before tax (updated by trigger)';
-COMMENT ON COLUMN payments.service_type IS 'Discriminates between cleaning and laundry payments';
