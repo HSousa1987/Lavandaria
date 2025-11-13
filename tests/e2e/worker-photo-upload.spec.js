@@ -143,6 +143,12 @@ test.describe('Worker Photo Upload - Batch Limits', () => {
 
             // Cleanup batch files
             files.forEach(file => fs.unlinkSync(file));
+
+            // Add delay between batch submissions to allow server processing
+            // and modal state reset if UI is involved
+            if (batch < 5) {
+                await page.waitForTimeout(500);
+            }
         }
 
         expect(totalUploaded).toBe(50);
