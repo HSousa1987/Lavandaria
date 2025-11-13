@@ -13,7 +13,6 @@ router.get('/', requireStaff, async (req, res) => {
         const { limit, offset, sort, order } = validatePagination(req);
 
         const query = `SELECT id, phone, name, email, date_of_birth, nif,
-                    address_line1, address_line2, city, postal_code, district,
                     notes, is_enterprise, company_name, created_at, is_active
              FROM clients
              ORDER BY created_at ${order}
@@ -44,7 +43,6 @@ router.get('/:id', requireMasterOrAdmin, async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT id, phone, name, email, date_of_birth, nif,
-                    address_line1, address_line2, city, postal_code, district,
                     notes, is_enterprise, company_name, created_at, is_active
              FROM clients WHERE id = $1`,
             [req.params.id]
@@ -69,20 +67,14 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
     console.log('🟢 ============================================');
 
     const { phone, name, email, date_of_birth, nif,
-            address_line1, address_line2, city, postal_code, district,
             notes, is_enterprise, company_name } = req.body;
 
-    console.log('📥 Received data from frontend (V2 schema):');
+    console.log('📥 Received data from frontend (V2 schema - no address fields):');
     console.log('   - phone:', phone);
     console.log('   - name:', name);
     console.log('   - email:', email);
     console.log('   - date_of_birth:', date_of_birth);
     console.log('   - nif:', nif);
-    console.log('   - address_line1:', address_line1);
-    console.log('   - address_line2:', address_line2);
-    console.log('   - city:', city);
-    console.log('   - postal_code:', postal_code);
-    console.log('   - district:', district);
     console.log('   - notes:', notes);
     console.log('   - is_enterprise:', is_enterprise);
     console.log('   - company_name:', company_name);
@@ -97,21 +89,17 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
         console.log('📝 V2 Schema - Client name:', clientName, '(enterprise:', is_enterprise, ')');
 
         const query = `INSERT INTO clients (phone, password, name, email, date_of_birth,
-                                 nif, address_line1, address_line2, city, postal_code, district,
-                                 notes, is_enterprise, company_name)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                                 nif, notes, is_enterprise, company_name)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING id, phone, name, email, date_of_birth, nif,
-                       address_line1, address_line2, city, postal_code, district,
                        notes, is_enterprise, company_name`;
 
         const values = [phone, defaultPassword, clientName, email, date_of_birth,
-             nif, address_line1, address_line2, city, postal_code, district,
-             notes, is_enterprise, company_name];
+             nif, notes, is_enterprise, company_name];
 
-        console.log('📝 Executing INSERT query with', values.length, 'parameters (V2)');
+        console.log('📝 Executing INSERT query with', values.length, 'parameters (V2 - no address)');
         console.log('📝 Values to insert:', {
-            phone, name: clientName, email, date_of_birth, nif,
-            address_line1, address_line2, city, postal_code, district, is_enterprise
+            phone, name: clientName, email, date_of_birth, nif, notes, is_enterprise
         });
 
         const result = await pool.query(query, values);
@@ -147,7 +135,6 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
 // Update client (Master or Admin only)
 router.put('/:id', requireMasterOrAdmin, async (req, res) => {
     const { phone, name, email, date_of_birth, nif,
-            address_line1, address_line2, city, postal_code, district,
             notes, is_active, is_enterprise, company_name } = req.body;
 
     try {
@@ -157,15 +144,12 @@ router.put('/:id', requireMasterOrAdmin, async (req, res) => {
         const result = await pool.query(
             `UPDATE clients
              SET phone = $1, name = $2, email = $3,
-                 date_of_birth = $4, nif = $5, address_line1 = $6, address_line2 = $7, city = $8,
-                 postal_code = $9, district = $10, notes = $11, is_active = $12,
-                 is_enterprise = $13, company_name = $14
-             WHERE id = $15
+                 date_of_birth = $4, nif = $5, notes = $6, is_active = $7,
+                 is_enterprise = $8, company_name = $9
+             WHERE id = $10
              RETURNING id, phone, name, email, date_of_birth, nif,
-                       address_line1, address_line2, city, postal_code, district,
                        notes, is_active, is_enterprise, company_name`,
             [phone, clientName, email, date_of_birth, nif,
-             address_line1, address_line2, city, postal_code, district,
              notes, is_active, is_enterprise, company_name, req.params.id]
         );
 
