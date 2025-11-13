@@ -48,6 +48,7 @@ const FIXED_IDS = {
     admin: 2,
     worker: 3,
     client: 1,
+    property: 1,
     cleaningJob: 100,
     laundryOrder: 200
 };
@@ -121,6 +122,7 @@ async function cleanupTestData(client) {
         await client.query(`DELETE FROM cleaning_job_photos WHERE cleaning_job_id = $1`, [FIXED_IDS.cleaningJob]);
         await client.query(`DELETE FROM cleaning_job_workers WHERE cleaning_job_id = $1`, [FIXED_IDS.cleaningJob]);
         await client.query(`DELETE FROM cleaning_jobs WHERE id = $1`, [FIXED_IDS.cleaningJob]);
+        await client.query(`DELETE FROM properties WHERE id = $1`, [FIXED_IDS.property]);
         await client.query(`DELETE FROM laundry_order_items WHERE laundry_order_id = $1`, [FIXED_IDS.laundryOrder]);
         await client.query(`DELETE FROM laundry_orders_new WHERE id = $1`, [FIXED_IDS.laundryOrder]);
         await client.query(`DELETE FROM clients WHERE id = $1`, [FIXED_IDS.client]);
@@ -140,13 +142,13 @@ async function seedUsersWithFixedIds(client) {
     const hashedAdmin = await bcrypt.hash(TEST_CREDENTIALS.admin.password, 10);
     const hashedWorker = await bcrypt.hash(TEST_CREDENTIALS.worker.password, 10);
 
-    // Insert with explicit IDs
+    // Insert with explicit IDs (V2 schema: role_id, name)
     await client.query(`
-        INSERT INTO users (id, username, password, role, full_name, email, phone)
+        INSERT INTO users (id, username, password, role_id, name, email, phone)
         VALUES
-            ($1, $2, $3, 'master', 'Master User', 'master@lavandaria.test', '900000000'),
-            ($4, $5, $6, 'admin', 'Admin User', 'admin@lavandaria.test', '900000001'),
-            ($7, $8, $9, 'worker', 'Test Worker', 'worker@lavandaria.test', '900000002')
+            ($1, $2, $3, 1, 'Master User', 'master@lavandaria.test', '900000000'),
+            ($4, $5, $6, 2, 'Admin User', 'admin@lavandaria.test', '900000001'),
+            ($7, $8, $9, 3, 'Test Worker', 'worker@lavandaria.test', '900000002')
         ON CONFLICT (id) DO UPDATE SET
             password = EXCLUDED.password
     `, [
@@ -168,7 +170,7 @@ async function seedClientWithFixedId(client) {
     const hashedPassword = await bcrypt.hash(TEST_CREDENTIALS.client.password, 10);
 
     await client.query(`
-        INSERT INTO clients (id, phone, password, full_name, email, nif, must_change_password)
+        INSERT INTO clients (id, phone, password, name, email, nif, must_change_password)
         VALUES ($1, $2, $3, 'Test Client', 'client@lavandaria.test', '123456789', false)
         ON CONFLICT (id) DO UPDATE SET
             password = EXCLUDED.password,
@@ -179,26 +181,47 @@ async function seedClientWithFixedId(client) {
     return FIXED_IDS.client;
 }
 
-async function seedCleaningJobWithPhotos(client, workerId, clientId, adminId, photoFiles) {
-    console.log('\n📝 Seeding cleaning job with FIXED ID and photos...');
+async function seedPropertyWithFixedId(client, clientId) {
+    console.log('\n📝 Seeding property with FIXED ID (V2 schema)...');
+
+    await client.query(`
+        INSERT INTO properties (id, client_id, property_name, address_line1, city, postal_code, district, property_type_id, is_primary)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+        ON CONFLICT (id) DO UPDATE SET
+            property_name = EXCLUDED.property_name,
+            address_line1 = EXCLUDED.address_line1
+    `, [
+        FIXED_IDS.property,
+        clientId,
+        'Test Airbnb Apartment',
+        'Avenida da Liberdade, 100',
+        'Lisboa',
+        '1200-001',
+        'Lisboa',
+        2 // apartamento (property_type_id from init.sql)
+    ]);
+
+    console.log(`✅ Created Property (ID: ${FIXED_IDS.property}): Test Airbnb Apartment`);
+    return FIXED_IDS.property;
+}
+
+async function seedCleaningJobWithPhotos(client, workerId, clientId, propertyId, adminId, photoFiles) {
+    console.log('\n📝 Seeding cleaning job with FIXED ID and photos (V2 schema)...');
 
     // Create cleaning job
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     await client.query(`
         INSERT INTO cleaning_jobs (
-            id, client_id, job_type, property_name, property_address,
-            address_line1, city, postal_code, district, country,
+            id, client_id, property_id, job_type,
             scheduled_date, scheduled_time, assigned_worker_id,
             estimated_hours, hourly_rate, status, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         ON CONFLICT (id) DO UPDATE SET
             assigned_worker_id = EXCLUDED.assigned_worker_id,
             status = EXCLUDED.status
     `, [
-        FIXED_IDS.cleaningJob, clientId, 'airbnb', 'Test Airbnb Apartment',
-        'Avenida da Liberdade, 100, Lisboa',
-        'Avenida da Liberdade, 100', 'Lisboa', '1200-001', 'Lisboa', 'Portugal',
+        FIXED_IDS.cleaningJob, clientId, propertyId, 'airbnb',
         tomorrow, '10:00', workerId,
         2.0, 15.00, 'in_progress', adminId
     ]);
@@ -287,7 +310,8 @@ async function main() {
         // Seed with fixed IDs
         const { adminId, workerId } = await seedUsersWithFixedIds(client);
         const clientId = await seedClientWithFixedId(client);
-        const jobId = await seedCleaningJobWithPhotos(client, workerId, clientId, adminId, photoFiles);
+        const propertyId = await seedPropertyWithFixedId(client, clientId);
+        const jobId = await seedCleaningJobWithPhotos(client, workerId, clientId, propertyId, adminId, photoFiles);
         const orderId = await seedLaundryOrderWithTransitions(client, clientId);
 
         await client.query('COMMIT');
@@ -298,6 +322,7 @@ async function main() {
         console.log(`   Admin ID: ${FIXED_IDS.admin}`);
         console.log(`   Worker ID: ${FIXED_IDS.worker}`);
         console.log(`   Client ID: ${FIXED_IDS.client}`);
+        console.log(`   Property ID: ${FIXED_IDS.property} (V2 schema: property-based workflow)`);
         console.log(`   Cleaning Job ID: ${FIXED_IDS.cleaningJob} (${photoFiles.length} photos)`);
         console.log(`   Laundry Order ID: ${FIXED_IDS.laundryOrder}`);
         console.log(`\n💡 Data is IDEMPOTENT - you can run this script multiple times.`);
