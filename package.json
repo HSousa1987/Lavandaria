@@ -20,7 +20,7 @@
     "test:e2e:report": "playwright show-report",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:no-preflight": "playwright test",
-    "test:seed": "node scripts/seed-test-data.js",
+    "test:seed": "node scripts/seed-test-data-deterministic.js",
     "test:prepare": "npm run test:seed && npm run test:e2e"
   },
   "keywords": [
