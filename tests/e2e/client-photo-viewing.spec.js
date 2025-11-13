@@ -181,6 +181,13 @@ test.describe('Client Photo Viewing - RBAC Enforcement', () => {
 
         // Login as worker
         await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        // Select Staff tab before login (required for worker credentials)
+        await page.getByRole('button', { name: 'Staff' }).click();
+        await page.waitForTimeout(200); // Small buffer for tab switch
+
+        // Fill credentials
         await page.fill('input[name="username"]', WORKER_CREDENTIALS.username);
         await page.fill('input[name="password"]', WORKER_CREDENTIALS.password);
         await page.click('button[type="submit"]');
