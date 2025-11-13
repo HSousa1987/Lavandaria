@@ -1,0 +1,294 @@
+=== TABLE: clients ===
+                                             Table "public.clients"
+        Column        |            Type             | Collation | Nullable |               Default               
+----------------------+-----------------------------+-----------+----------+-------------------------------------
+ id                   | integer                     |           | not null | nextval('clients_id_seq'::regclass)
+ phone                | character varying(20)       |           | not null | 
+ password             | character varying(255)      |           | not null | 
+ full_name            | character varying(100)      |           | not null | 
+ first_name           | character varying(100)      |           |          | 
+ last_name            | character varying(100)      |           |          | 
+ email                | character varying(100)      |           |          | 
+ date_of_birth        | date                        |           |          | 
+ nif                  | character varying(20)       |           |          | 
+ address_line1        | character varying(200)      |           |          | 
+ address_line2        | character varying(200)      |           |          | 
+ city                 | character varying(100)      |           |          | 
+ postal_code          | character varying(20)       |           |          | 
+ district             | character varying(100)      |           |          | 
+ country              | character varying(100)      |           |          | 'Portugal'::character varying
+ notes                | text                        |           |          | 
+ is_enterprise        | boolean                     |           |          | false
+ company_name         | character varying(200)      |           |          | 
+ registration_date    | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ created_at           | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ is_active            | boolean                     |           |          | true
+ must_change_password | boolean                     |           |          | true
+Indexes:
+    "clients_pkey" PRIMARY KEY, btree (id)
+    "clients_phone_key" UNIQUE CONSTRAINT, btree (phone)
+    "idx_clients_is_active" btree (is_active)
+    "idx_clients_phone" btree (phone)
+Referenced by:
+    TABLE "cleaning_jobs" CONSTRAINT "cleaning_jobs_client_id_fkey" FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+    TABLE "job_notifications" CONSTRAINT "job_notifications_client_id_fkey" FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+    TABLE "laundry_orders_new" CONSTRAINT "laundry_orders_new_client_id_fkey" FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+    TABLE "payments_cleaning" CONSTRAINT "payments_cleaning_client_id_fkey" FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+    TABLE "payments_laundry" CONSTRAINT "payments_laundry_client_id_fkey" FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+    TABLE "properties" CONSTRAINT "properties_client_id_fkey" FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+
+
+=== TABLE: users ===
+                                            Table "public.users"
+      Column       |            Type             | Collation | Nullable |              Default              
+-------------------+-----------------------------+-----------+----------+-----------------------------------
+ id                | integer                     |           | not null | nextval('users_id_seq'::regclass)
+ username          | character varying(50)       |           | not null | 
+ password          | character varying(255)      |           | not null | 
+ role              | character varying(20)       |           | not null | 
+ full_name         | character varying(100)      |           | not null | 
+ first_name        | character varying(100)      |           |          | 
+ last_name         | character varying(100)      |           |          | 
+ email             | character varying(100)      |           |          | 
+ phone             | character varying(20)       |           |          | 
+ date_of_birth     | date                        |           |          | 
+ nif               | character varying(20)       |           |          | 
+ address_line1     | character varying(200)      |           |          | 
+ address_line2     | character varying(200)      |           |          | 
+ city              | character varying(100)      |           |          | 
+ postal_code       | character varying(20)       |           |          | 
+ district          | character varying(100)      |           |          | 
+ country           | character varying(100)      |           |          | 'Portugal'::character varying
+ created_at        | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ updated_at        | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ registration_date | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ is_active         | boolean                     |           |          | true
+ created_by        | integer                     |           |          | 
+Indexes:
+    "users_pkey" PRIMARY KEY, btree (id)
+    "idx_users_role" btree (role)
+    "idx_users_username" btree (username)
+    "users_username_key" UNIQUE CONSTRAINT, btree (username)
+Check constraints:
+    "users_role_check" CHECK (role::text = ANY (ARRAY['master'::character varying, 'admin'::character varying, 'worker'::character varying]::text[]))
+Foreign-key constraints:
+    "users_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+Referenced by:
+    TABLE "cleaning_job_photos" CONSTRAINT "cleaning_job_photos_worker_id_fkey" FOREIGN KEY (worker_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "cleaning_job_workers" CONSTRAINT "cleaning_job_workers_worker_id_fkey" FOREIGN KEY (worker_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "cleaning_jobs" CONSTRAINT "cleaning_jobs_assigned_worker_id_fkey" FOREIGN KEY (assigned_worker_id) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "cleaning_jobs" CONSTRAINT "cleaning_jobs_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id)
+    TABLE "cleaning_time_logs" CONSTRAINT "cleaning_time_logs_worker_id_fkey" FOREIGN KEY (worker_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "job_notifications" CONSTRAINT "job_notifications_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "laundry_orders_new" CONSTRAINT "laundry_orders_new_assigned_worker_id_fkey" FOREIGN KEY (assigned_worker_id) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "laundry_orders_new" CONSTRAINT "laundry_orders_new_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id)
+    TABLE "tickets" CONSTRAINT "tickets_assigned_to_fkey" FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "tickets" CONSTRAINT "tickets_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "tickets" CONSTRAINT "tickets_resolved_by_fkey" FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "users" CONSTRAINT "users_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+Triggers:
+    trigger_update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_users_updated_at()
+
+
+=== TABLE: cleaning_jobs ===
+                                              Table "public.cleaning_jobs"
+         Column         |            Type             | Collation | Nullable |                  Default                  
+------------------------+-----------------------------+-----------+----------+-------------------------------------------
+ id                     | integer                     |           | not null | nextval('cleaning_jobs_id_seq'::regclass)
+ client_id              | integer                     |           | not null | 
+ assigned_worker_id     | integer                     |           |          | 
+ job_type               | character varying(20)       |           | not null | 
+ property_name          | character varying(200)      |           |          | 
+ property_address       | text                        |           | not null | 
+ address_line1          | character varying(200)      |           | not null | 
+ address_line2          | character varying(200)      |           |          | 
+ city                   | character varying(100)      |           | not null | 
+ postal_code            | character varying(20)       |           |          | 
+ district               | character varying(100)      |           |          | 
+ country                | character varying(100)      |           |          | 'Portugal'::character varying
+ scheduled_date         | date                        |           | not null | 
+ scheduled_time         | time without time zone      |           | not null | 
+ estimated_hours        | numeric(5,2)                |           |          | 
+ actual_start_time      | timestamp without time zone |           |          | 
+ actual_end_time        | timestamp without time zone |           |          | 
+ total_duration_minutes | integer                     |           |          | 
+ hourly_rate            | numeric(10,2)               |           |          | 15.00
+ total_cost             | numeric(10,2)               |           |          | 
+ status                 | character varying(20)       |           | not null | 'scheduled'::character varying
+ payment_status         | character varying(20)       |           |          | 'pending'::character varying
+ payment_method         | character varying(50)       |           |          | 
+ paid_amount            | numeric(10,2)               |           |          | 0
+ notes                  | text                        |           |          | 
+ special_instructions   | text                        |           |          | 
+ client_feedback        | text                        |           |          | 
+ client_rating          | integer                     |           |          | 
+ created_by             | integer                     |           |          | 
+ created_at             | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ updated_at             | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ completed_at           | timestamp without time zone |           |          | 
+ push_notification_sent | boolean                     |           |          | false
+ client_viewed_photos   | boolean                     |           |          | false
+ last_synced_at         | timestamp without time zone |           |          | 
+Indexes:
+    "cleaning_jobs_pkey" PRIMARY KEY, btree (id)
+    "idx_cleaning_jobs_client" btree (client_id)
+    "idx_cleaning_jobs_date" btree (scheduled_date)
+    "idx_cleaning_jobs_status" btree (status)
+    "idx_cleaning_jobs_type" btree (job_type)
+    "idx_cleaning_jobs_worker" btree (assigned_worker_id)
+Check constraints:
+    "cleaning_jobs_client_rating_check" CHECK (client_rating >= 1 AND client_rating <= 5)
+    "cleaning_jobs_job_type_check" CHECK (job_type::text = ANY (ARRAY['airbnb'::character varying, 'house'::character varying]::text[]))
+    "cleaning_jobs_payment_status_check" CHECK (payment_status::text = ANY (ARRAY['pending'::character varying, 'paid'::character varying, 'partial'::character varying]::text[]))
+    "cleaning_jobs_status_check" CHECK (status::text = ANY (ARRAY['scheduled'::character varying, 'in_progress'::character varying, 'completed'::character varying, 'cancelled'::character varying]::text[]))
+Foreign-key constraints:
+    "cleaning_jobs_assigned_worker_id_fkey" FOREIGN KEY (assigned_worker_id) REFERENCES users(id) ON DELETE SET NULL
+    "cleaning_jobs_client_id_fkey" FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+    "cleaning_jobs_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id)
+Referenced by:
+    TABLE "cleaning_job_photos" CONSTRAINT "cleaning_job_photos_cleaning_job_id_fkey" FOREIGN KEY (cleaning_job_id) REFERENCES cleaning_jobs(id) ON DELETE CASCADE
+    TABLE "cleaning_job_workers" CONSTRAINT "cleaning_job_workers_cleaning_job_id_fkey" FOREIGN KEY (cleaning_job_id) REFERENCES cleaning_jobs(id) ON DELETE CASCADE
+    TABLE "cleaning_time_logs" CONSTRAINT "cleaning_time_logs_cleaning_job_id_fkey" FOREIGN KEY (cleaning_job_id) REFERENCES cleaning_jobs(id) ON DELETE CASCADE
+    TABLE "job_notifications" CONSTRAINT "job_notifications_cleaning_job_id_fkey" FOREIGN KEY (cleaning_job_id) REFERENCES cleaning_jobs(id) ON DELETE CASCADE
+    TABLE "payments_cleaning" CONSTRAINT "payments_cleaning_cleaning_job_id_fkey" FOREIGN KEY (cleaning_job_id) REFERENCES cleaning_jobs(id) ON DELETE CASCADE
+Triggers:
+    trigger_calculate_cleaning_cost BEFORE INSERT OR UPDATE ON cleaning_jobs FOR EACH ROW EXECUTE FUNCTION calculate_cleaning_job_cost()
+    trigger_update_cleaning_jobs_updated_at BEFORE UPDATE ON cleaning_jobs FOR EACH ROW EXECUTE FUNCTION update_cleaning_jobs_updated_at()
+
+
+=== TABLE: laundry_orders_new ===
+                                                Table "public.laundry_orders_new"
+           Column           |            Type             | Collation | Nullable |                    Default                     
+----------------------------+-----------------------------+-----------+----------+------------------------------------------------
+ id                         | integer                     |           | not null | nextval('laundry_orders_new_id_seq'::regclass)
+ client_id                  | integer                     |           | not null | 
+ assigned_worker_id         | integer                     |           |          | 
+ order_number               | character varying(50)       |           | not null | 
+ order_type                 | character varying(20)       |           | not null | 
+ total_weight_kg            | numeric(10,2)               |           |          | 
+ price_per_kg               | numeric(10,2)               |           |          | 3.50
+ base_price                 | numeric(10,2)               |           |          | 
+ additional_charges         | numeric(10,2)               |           |          | 0
+ discount                   | numeric(10,2)               |           |          | 0
+ total_price                | numeric(10,2)               |           | not null | 
+ status                     | character varying(20)       |           | not null | 'received'::character varying
+ payment_status             | character varying(20)       |           |          | 'pending'::character varying
+ payment_method             | character varying(50)       |           |          | 
+ paid_amount                | numeric(10,2)               |           |          | 0
+ received_at                | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ ready_at                   | timestamp without time zone |           |          | 
+ collected_at               | timestamp without time zone |           |          | 
+ expected_ready_date        | date                        |           |          | 
+ ready_notification_sent    | boolean                     |           |          | false
+ ready_notification_sent_at | timestamp without time zone |           |          | 
+ client_notified_via        | character varying(50)       |           |          | 
+ special_instructions       | text                        |           |          | 
+ internal_notes             | text                        |           |          | 
+ client_feedback            | text                        |           |          | 
+ client_rating              | integer                     |           |          | 
+ created_by                 | integer                     |           |          | 
+ created_at                 | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ updated_at                 | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ push_notification_sent     | boolean                     |           |          | false
+ last_synced_at             | timestamp without time zone |           |          | 
+Indexes:
+    "laundry_orders_new_pkey" PRIMARY KEY, btree (id)
+    "idx_laundry_orders_client" btree (client_id)
+    "idx_laundry_orders_number" btree (order_number)
+    "idx_laundry_orders_status" btree (status)
+    "idx_laundry_orders_worker" btree (assigned_worker_id)
+    "laundry_orders_new_order_number_key" UNIQUE CONSTRAINT, btree (order_number)
+Check constraints:
+    "laundry_orders_new_client_rating_check" CHECK (client_rating >= 1 AND client_rating <= 5)
+    "laundry_orders_new_order_type_check" CHECK (order_type::text = ANY (ARRAY['bulk_kg'::character varying, 'itemized'::character varying, 'house_bundle'::character varying]::text[]))
+    "laundry_orders_new_payment_status_check" CHECK (payment_status::text = ANY (ARRAY['pending'::character varying, 'paid'::character varying, 'partial'::character varying]::text[]))
+    "laundry_orders_new_status_check" CHECK (status::text = ANY (ARRAY['received'::character varying, 'in_progress'::character varying, 'ready'::character varying, 'collected'::character varying, 'cancelled'::character varying]::text[]))
+Foreign-key constraints:
+    "laundry_orders_new_assigned_worker_id_fkey" FOREIGN KEY (assigned_worker_id) REFERENCES users(id) ON DELETE SET NULL
+    "laundry_orders_new_client_id_fkey" FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+    "laundry_orders_new_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id)
+Referenced by:
+    TABLE "job_notifications" CONSTRAINT "job_notifications_laundry_order_id_fkey" FOREIGN KEY (laundry_order_id) REFERENCES laundry_orders_new(id) ON DELETE CASCADE
+    TABLE "laundry_order_items" CONSTRAINT "laundry_order_items_laundry_order_id_fkey" FOREIGN KEY (laundry_order_id) REFERENCES laundry_orders_new(id) ON DELETE CASCADE
+    TABLE "payments_laundry" CONSTRAINT "payments_laundry_laundry_order_id_fkey" FOREIGN KEY (laundry_order_id) REFERENCES laundry_orders_new(id) ON DELETE CASCADE
+Triggers:
+    trigger_calculate_laundry_total BEFORE INSERT OR UPDATE ON laundry_orders_new FOR EACH ROW EXECUTE FUNCTION calculate_laundry_total()
+    trigger_update_laundry_orders_updated_at BEFORE UPDATE ON laundry_orders_new FOR EACH ROW EXECUTE FUNCTION update_laundry_orders_updated_at()
+
+
+=== TABLE: cleaning_job_photos ===
+                                            Table "public.cleaning_job_photos"
+      Column       |            Type             | Collation | Nullable |                     Default                     
+-------------------+-----------------------------+-----------+----------+-------------------------------------------------
+ id                | integer                     |           | not null | nextval('cleaning_job_photos_id_seq'::regclass)
+ cleaning_job_id   | integer                     |           | not null | 
+ worker_id         | integer                     |           | not null | 
+ photo_url         | character varying(500)      |           | not null | 
+ photo_type        | character varying(20)       |           | not null | 
+ room_area         | character varying(100)      |           |          | 
+ thumbnail_url     | character varying(500)      |           |          | 
+ file_size_kb      | integer                     |           |          | 
+ original_filename | character varying(255)      |           |          | 
+ caption           | text                        |           |          | 
+ uploaded_at       | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ viewed_by_client  | boolean                     |           |          | false
+ viewed_at         | timestamp without time zone |           |          | 
+Indexes:
+    "cleaning_job_photos_pkey" PRIMARY KEY, btree (id)
+    "idx_photos_job" btree (cleaning_job_id)
+    "idx_photos_type" btree (photo_type)
+Check constraints:
+    "cleaning_job_photos_photo_type_check" CHECK (photo_type::text = ANY (ARRAY['before'::character varying, 'after'::character varying, 'detail'::character varying]::text[]))
+Foreign-key constraints:
+    "cleaning_job_photos_cleaning_job_id_fkey" FOREIGN KEY (cleaning_job_id) REFERENCES cleaning_jobs(id) ON DELETE CASCADE
+    "cleaning_job_photos_worker_id_fkey" FOREIGN KEY (worker_id) REFERENCES users(id) ON DELETE CASCADE
+
+
+=== TABLE: payments_cleaning ===
+                                           Table "public.payments_cleaning"
+     Column      |            Type             | Collation | Nullable |                    Default                    
+-----------------+-----------------------------+-----------+----------+-----------------------------------------------
+ id              | integer                     |           | not null | nextval('payments_cleaning_id_seq'::regclass)
+ cleaning_job_id | integer                     |           | not null | 
+ client_id       | integer                     |           | not null | 
+ amount          | numeric(10,2)               |           | not null | 
+ payment_method  | character varying(20)       |           | not null | 
+ payment_date    | timestamp without time zone |           | not null | CURRENT_TIMESTAMP
+ notes           | text                        |           |          | 
+ created_at      | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+Indexes:
+    "payments_cleaning_pkey" PRIMARY KEY, btree (id)
+    "idx_payments_cleaning_client" btree (client_id)
+    "idx_payments_cleaning_date" btree (payment_date)
+    "idx_payments_cleaning_job" btree (cleaning_job_id)
+Check constraints:
+    "payments_cleaning_payment_method_check" CHECK (payment_method::text = ANY (ARRAY['cash'::character varying, 'card'::character varying, 'transfer'::character varying, 'mbway'::character varying, 'other'::character varying]::text[]))
+Foreign-key constraints:
+    "payments_cleaning_cleaning_job_id_fkey" FOREIGN KEY (cleaning_job_id) REFERENCES cleaning_jobs(id) ON DELETE CASCADE
+    "payments_cleaning_client_id_fkey" FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+
+
+=== TABLE: payments_laundry ===
+                                           Table "public.payments_laundry"
+      Column      |            Type             | Collation | Nullable |                   Default                    
+------------------+-----------------------------+-----------+----------+----------------------------------------------
+ id               | integer                     |           | not null | nextval('payments_laundry_id_seq'::regclass)
+ laundry_order_id | integer                     |           | not null | 
+ client_id        | integer                     |           | not null | 
+ amount           | numeric(10,2)               |           | not null | 
+ payment_method   | character varying(20)       |           | not null | 
+ payment_date     | timestamp without time zone |           | not null | CURRENT_TIMESTAMP
+ notes            | text                        |           |          | 
+ created_at       | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+Indexes:
+    "payments_laundry_pkey" PRIMARY KEY, btree (id)
+    "idx_payments_laundry_client" btree (client_id)
+    "idx_payments_laundry_date" btree (payment_date)
+    "idx_payments_laundry_order" btree (laundry_order_id)
+Check constraints:
+    "payments_laundry_payment_method_check" CHECK (payment_method::text = ANY (ARRAY['cash'::character varying, 'card'::character varying, 'transfer'::character varying, 'mbway'::character varying, 'other'::character varying]::text[]))
+Foreign-key constraints:
+    "payments_laundry_client_id_fkey" FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+    "payments_laundry_laundry_order_id_fkey" FOREIGN KEY (laundry_order_id) REFERENCES laundry_orders_new(id) ON DELETE CASCADE
+
+

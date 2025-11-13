@@ -1,0 +1,20 @@
+                 List of relations
+ Schema |         Name         | Type  |   Owner    
+--------+----------------------+-------+------------
+ public | cleaning_job_photos  | table | lavandaria
+ public | cleaning_job_workers | table | lavandaria
+ public | cleaning_jobs        | table | lavandaria
+ public | cleaning_time_logs   | table | lavandaria
+ public | clients              | table | lavandaria
+ public | job_notifications    | table | lavandaria
+ public | laundry_order_items  | table | lavandaria
+ public | laundry_orders_new   | table | lavandaria
+ public | laundry_services     | table | lavandaria
+ public | payments_cleaning    | table | lavandaria
+ public | payments_laundry     | table | lavandaria
+ public | properties           | table | lavandaria
+ public | session              | table | lavandaria
+ public | tickets              | table | lavandaria
+ public | users                | table | lavandaria
+(15 rows)
+

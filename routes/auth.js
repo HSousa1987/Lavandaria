@@ -30,7 +30,10 @@ router.post('/login/user', loginLimiter, [
 
     try {
         const result = await pool.query(
-            'SELECT * FROM users WHERE username = $1 AND is_active = true',
+            `SELECT u.*, rt.role_name as role
+             FROM users u
+             JOIN role_types rt ON u.role_id = rt.id
+             WHERE u.username = $1 AND u.is_active = true`,
             [username]
         );
 
@@ -66,7 +69,7 @@ router.post('/login/user', loginLimiter, [
 
         req.session.userId = user.id;
         req.session.userType = user.role;
-        req.session.userName = user.full_name;
+        req.session.userName = user.name;
 
         console.log(`✅ [AUTH] Login successful for user: ${username} - Role: ${user.role} [${req.correlationId}]`);
 
@@ -91,7 +94,7 @@ router.post('/login/user', loginLimiter, [
                     id: user.id,
                     username: user.username,
                     role: user.role,
-                    name: user.full_name
+                    name: user.name
                 },
                 _meta: {
                     correlationId: req.correlationId,
@@ -167,7 +170,7 @@ router.post('/login/client', loginLimiter, [
 
         req.session.clientId = client.id;
         req.session.userType = 'client';
-        req.session.userName = client.full_name;
+        req.session.userName = client.name;
         req.session.mustChangePassword = client.must_change_password;
 
         console.log(`✅ [AUTH] Client login successful: ${phone} [${req.correlationId}]`);
@@ -192,7 +195,7 @@ router.post('/login/client', loginLimiter, [
                 client: {
                     id: client.id,
                     phone: client.phone,
-                    name: client.full_name,
+                    name: client.name,
                     mustChangePassword: client.must_change_password
                 },
                 _meta: {

@@ -49,13 +49,13 @@ router.get('/stats', requireFinanceAccess, async (req, res) => {
 
         // Recent orders
         const recentOrders = await pool.query(`
-            (SELECT 'laundry' as type, lo.order_number, c.full_name as client_name, lo.status, lo.created_at
+            (SELECT 'laundry' as type, lo.order_number, c.name as client_name, lo.status, lo.created_at
              FROM laundry_orders_new lo
              JOIN clients c ON lo.client_id = c.id
              ORDER BY lo.created_at DESC
              LIMIT 5)
             UNION ALL
-            (SELECT 'airbnb' as type, CONCAT('CJ-', cj.id) as order_number, c.full_name as client_name, cj.status, cj.created_at
+            (SELECT 'airbnb' as type, CONCAT('CJ-', cj.id) as order_number, c.name as client_name, cj.status, cj.created_at
              FROM cleaning_jobs cj
              JOIN clients c ON cj.client_id = c.id
              ORDER BY cj.created_at DESC

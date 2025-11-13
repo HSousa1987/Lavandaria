@@ -16,9 +16,9 @@ router.get('/', requireMasterOrAdmin, async (req, res) => {
             // Master sees everyone
             countQuery = 'SELECT COUNT(*) FROM users';
             query = `
-                SELECT u.id, u.username, u.role, u.full_name, u.first_name, u.last_name, u.email, u.phone,
-                       u.date_of_birth, u.nif, u.address_line1, u.address_line2, u.city, u.postal_code, u.district, u.country,
-                       u.registration_date, u.created_at, u.is_active, u2.full_name as created_by_name
+                SELECT u.id, u.username, u.role, u.name, u.name, u.name, u.email, u.phone,
+                       u.date_of_birth, u.nif, u.address_line1, u.address_line2, u.city, u.postal_code, u.district, u.country_REMOVED_IN_V2,
+                       u.registration_date_REMOVED_IN_V2, u.created_at, u.is_active, u2.full_name as created_by_name
                 FROM users u
                 LEFT JOIN users u2 ON u.created_by = u2.id
                 ORDER BY

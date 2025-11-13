@@ -24,7 +24,7 @@ router.get('/client/:clientId', requireMasterOrAdmin, async (req, res) => {
 router.get('/:id', requireStaff, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT p.*, c.full_name as client_name, c.phone as client_phone
+            `SELECT p.*, c.name as client_name, c.phone as client_phone
              FROM properties p
              JOIN clients c ON p.client_id = c.id
              WHERE p.id = $1`,

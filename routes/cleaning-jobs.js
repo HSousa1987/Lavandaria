@@ -55,8 +55,8 @@ router.get('/', requireAuth, async (req, res) => {
             countParams = [];
             query = `
                 SELECT cj.*,
-                       c.full_name as client_name, c.phone as client_phone,
-                       u.full_name as worker_name
+                       c.name as client_name, c.phone as client_phone,
+                       u.name as worker_name
                 FROM cleaning_jobs cj
                 JOIN clients c ON cj.client_id = c.id
                 LEFT JOIN users u ON cj.assigned_worker_id = u.id
@@ -70,7 +70,7 @@ router.get('/', requireAuth, async (req, res) => {
             countParams = [req.session.userId];
             query = `
                 SELECT cj.*,
-                       c.full_name as client_name, c.phone as client_phone
+                       c.name as client_name, c.phone as client_phone
                 FROM cleaning_jobs cj
                 JOIN clients c ON cj.client_id = c.id
                 WHERE cj.assigned_worker_id = $1
@@ -84,7 +84,7 @@ router.get('/', requireAuth, async (req, res) => {
             countParams = [req.session.clientId];
             query = `
                 SELECT cj.*,
-                       u.full_name as worker_name
+                       u.name as worker_name
                 FROM cleaning_jobs cj
                 LEFT JOIN users u ON cj.assigned_worker_id = u.id
                 WHERE cj.client_id = $1
@@ -123,8 +123,8 @@ router.get('/:id', requireAuth, async (req, res) => {
     try {
         const jobResult = await pool.query(
             `SELECT cj.*,
-                    c.full_name as client_name, c.phone as client_phone, c.email as client_email,
-                    u.full_name as worker_name
+                    c.name as client_name, c.phone as client_phone, c.email as client_email,
+                    u.name as worker_name
              FROM cleaning_jobs cj
              JOIN clients c ON cj.client_id = c.id
              LEFT JOIN users u ON cj.assigned_worker_id = u.id
@@ -155,7 +155,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 
         const [photosResult, photoCountResult] = await Promise.all([
             pool.query(
-                `SELECT p.*, u.full_name as uploaded_by_name
+                `SELECT p.*, u.name as uploaded_by_name
                  FROM cleaning_job_photos p
                  LEFT JOIN users u ON p.worker_id = u.id
                  WHERE p.cleaning_job_id = $1
@@ -171,7 +171,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 
         // Get time logs
         const timeLogsResult = await pool.query(
-            `SELECT tl.*, u.full_name as worker_name
+            `SELECT tl.*, u.name as worker_name
              FROM cleaning_time_logs tl
              JOIN users u ON tl.worker_id = u.id
              WHERE tl.cleaning_job_id = $1
@@ -221,9 +221,9 @@ router.get('/:id/full', requireAuth, async (req, res) => {
     try {
         const jobResult = await pool.query(
             `SELECT cj.*,
-                    c.full_name as client_name, c.phone as client_phone, c.email as client_email,
+                    c.name as client_name, c.phone as client_phone, c.email as client_email,
                     c.address_line1 as client_address,
-                    u.full_name as worker_name,
+                    u.name as worker_name,
                     creator.full_name as created_by_name
              FROM cleaning_jobs cj
              JOIN clients c ON cj.client_id = c.id
@@ -249,7 +249,7 @@ router.get('/:id/full', requireAuth, async (req, res) => {
 
         // Get photos
         const photosResult = await pool.query(
-            `SELECT p.*, u.full_name as uploaded_by_name
+            `SELECT p.*, u.name as uploaded_by_name
              FROM cleaning_job_photos p
              LEFT JOIN users u ON p.worker_id = u.id
              WHERE p.cleaning_job_id = $1
@@ -259,7 +259,7 @@ router.get('/:id/full', requireAuth, async (req, res) => {
 
         // Get time logs
         const timeLogsResult = await pool.query(
-            `SELECT tl.*, u.full_name as worker_name
+            `SELECT tl.*, u.name as worker_name
              FROM cleaning_time_logs tl
              JOIN users u ON tl.worker_id = u.id
              WHERE tl.cleaning_job_id = $1
@@ -269,7 +269,7 @@ router.get('/:id/full', requireAuth, async (req, res) => {
 
         // Get payments for this job
         const paymentsResult = await pool.query(
-            `SELECT p.*, u.full_name as recorded_by_name
+            `SELECT p.*, u.name as recorded_by_name
              FROM payments p
              LEFT JOIN users u ON u.id = (p.notes::jsonb->>'recorded_by_user_id')::integer
              WHERE p.order_type = 'airbnb' AND p.order_id = $1
