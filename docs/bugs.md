@@ -42,6 +42,119 @@ This log tracks bugs discovered, their root causes, fixes applied, and tests add
 
 ## Active Bugs
 
+### 2025-11-13 - Database V2 Schema Mismatch - Backend/Frontend Not Synced (P0 - CRITICAL BLOCKER)
+
+**Evidence:**
+- Database migrated to V2 schema on Nov 9, 2025 ✅ (COMPLETE)
+- Backend routes NOT updated ❌ - still query V1 columns that no longer exist
+- Frontend forms NOT updated ❌ - still send V1 field names
+- Grep search found **85 occurrences** of old column names across 10 route files
+- System appears to start (no startup errors) but ALL CRUD operations will crash
+- Discovery date: 2025-11-13 during database simplification implementation analysis
+
+**Examples of Broken Code:**
+
+From [routes/users.js:19](../routes/users.js#L19):
+```sql
+-- BROKEN: Queries non-existent columns
+SELECT u.id, u.username, u.role, u.full_name, u.first_name, u.last_name, u.email, u.phone,
+       u.date_of_birth, u.nif, u.address_line1, u.address_line2, u.city, u.postal_code,
+       u.district, u.country, u.registration_date, u.created_at, u.is_active
+FROM users u
+
+-- Columns that NO LONGER EXIST in V2 schema:
+-- ❌ role (now role_id FK to role_types)
+-- ❌ full_name, first_name, last_name (now single 'name' field)
+-- ❌ country, registration_date (removed in Portugal-only simplification)
+```
+
+From [routes/cleaning-jobs.js:58](../routes/cleaning-jobs.js#L58):
+```sql
+-- BROKEN: Missing property_id FK and JOIN with properties table
+SELECT cj.*,
+       c.full_name as client_name, c.phone as client_phone,
+       u.full_name as worker_name
+FROM cleaning_jobs cj
+JOIN clients c ON cj.client_id = c.id
+
+-- Should be:
+SELECT cj.*,
+       c.name as client_name, c.phone as client_phone,
+       u.name as worker_name,
+       p.property_name, p.address_line1, p.city
+FROM cleaning_jobs cj
+JOIN clients c ON cj.client_id = c.id
+JOIN properties p ON cj.property_id = p.id
+LEFT JOIN users u ON cj.assigned_worker_id = u.id
+```
+
+**Root Cause:**
+- Database migration executed as standalone task on Nov 9
+- Backend route updates deferred as separate work order
+- Frontend form updates deferred as separate work order
+- No validation step between migration and code sync
+- System non-functional but appears healthy (Docker starts, no error logs at startup)
+
+**Impact:**
+- **ALL user management operations broken** (create, read, update, delete users)
+- **ALL client management operations broken** (create, read, update, delete clients)
+- **ALL cleaning job operations broken** (create, read, update, delete jobs)
+- **ALL property operations broken** (new table, no routes exist)
+- **ALL payment operations broken** (unified table, no routes exist)
+- **RBAC completely broken** (role field doesn't exist)
+- **Dashboard completely broken** (all aggregation queries broken)
+- System appears to work but crashes on ANY database operation
+- **E2E tests will ALL fail** with SQL errors once backend sync attempted
+
+**Fix Summary:**
+- **Backend Route Sync** (8-11 hours estimated):
+  1. Update routes/auth.js (30 min) - role → role_id JOIN, full_name → name
+  2. Update routes/users.js (2-3h) - role → role_id JOIN, name fields, remove country
+  3. Update routes/clients.js (1-2h) - name fields, remove country
+  4. Update routes/cleaning-jobs.js (2-3h) - Add property_id FK, JOIN properties, name fields
+  5. **Replace** routes/properties.js (1h) - NEW routes for properties CRUD
+  6. **Replace** routes/payments.js (1-2h) - NEW routes for unified payments table
+  7. Update routes/reports.js, laundry-orders.js, dashboard.js, notifications.js (2h total)
+
+- **Frontend Form Sync** (4-6 hours estimated):
+  1. Update UserForm.js - role → role_id dropdown, name field
+  2. Update ClientForm.js - name field, remove country
+  3. **Create** PropertyForm.js - NEW component for property CRUD
+  4. Update CleaningJobForm.js - Add property_id dropdown, update field names
+
+- **Testing & Validation** (3-4 hours):
+  1. Update seed script for V2 schema
+  2. Run E2E tests to validate all operations
+  3. Regression testing for existing features
+
+**Tests Added:**
+- [ ] Backend sync validation tests (check all routes work with V2 schema)
+- [ ] Frontend form submission tests (check all forms send correct field names)
+- [ ] E2E regression suite (validate no existing features broken)
+
+**Security Verified:**
+- ❌ **NOT YET** - System non-functional, cannot verify security posture
+- Once fixed:
+  - [ ] RBAC enforcement with role_types table
+  - [ ] Parameterized queries maintained
+  - [ ] Session handling unchanged
+  - [ ] File upload validation unchanged
+
+**Work Orders:**
+- [DWO-20251113-P0-DATABASE-V2-BACKEND-SYNC](../handoff/MAESTRO-DB-SIMPLIFICATION-STATUS-20251113.md#recommended-immediate-action-p0-work-order) - Backend route sync (8-11h)
+- [DWO-20251113-P0-DATABASE-V2-FRONTEND-SYNC](../handoff/MAESTRO-DB-SIMPLIFICATION-STATUS-20251113.md) - Frontend form sync (4-6h)
+- [TWO-20251113-P0-DATABASE-V2-VALIDATION](../handoff/MAESTRO-DB-SIMPLIFICATION-STATUS-20251113.md) - E2E validation (3-4h)
+
+**Reference Documents:**
+- [WO-20251109-DATABASE-SIMPLIFICATION.md](../handoff/WO-20251109-DATABASE-SIMPLIFICATION.md) - Original migration work order (1790 lines)
+- [DATABASE-V2-MIGRATION-STATUS.md](../handoff/DATABASE-V2-MIGRATION-STATUS.md) - Migration completion status
+- [SCHEMA-SIMPLIFIED-V2.sql](../database/SCHEMA-SIMPLIFIED-V2.sql) - New database schema
+- [MAESTRO-DB-SIMPLIFICATION-STATUS-20251113.md](../handoff/MAESTRO-DB-SIMPLIFICATION-STATUS-20251113.md) - Complete analysis document
+
+**Commit:** [3d20fe5](https://github.com/HSousa1987/Lavandaria/commit/3d20fe5) - Analysis document
+
+---
+
 ### 2025-10-26 - Playwright Request API Does Not Support Multiple File Uploads (P2)
 
 **Evidence:**
