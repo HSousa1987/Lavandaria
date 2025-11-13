@@ -33,12 +33,10 @@ router.get('/stats', requireFinanceAccess, async (req, res) => {
         const airbnbResult = await pool.query('SELECT COUNT(*) as count FROM cleaning_jobs');
         const totalAirbnbOrders = parseInt(airbnbResult.rows[0].count);
 
-        // Total revenue (sum from both payment tables)
+        // Total revenue (sum from unified payments table)
         const revenueResult = await pool.query(`
-            SELECT (
-                COALESCE((SELECT SUM(amount) FROM payments_cleaning), 0) +
-                COALESCE((SELECT SUM(amount) FROM payments_laundry), 0)
-            ) as total
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM payments
         `);
         const totalRevenue = parseFloat(revenueResult.rows[0].total) || 0;
 
