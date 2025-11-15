@@ -12,9 +12,8 @@ router.get('/', requireStaff, async (req, res) => {
     try {
         const { limit, offset, sort, order } = validatePagination(req);
 
-        const query = `SELECT id, phone, full_name, first_name, last_name, email, date_of_birth, nif,
-                    address_line1, address_line2, city, postal_code, district, country,
-                    notes, is_enterprise, company_name, registration_date, created_at, is_active
+        const query = `SELECT id, phone, name, email, date_of_birth, nif,
+                    notes, is_enterprise, company_name, created_at, is_active
              FROM clients
              ORDER BY created_at ${order}
              LIMIT $1 OFFSET $2`;
@@ -43,9 +42,8 @@ router.get('/', requireStaff, async (req, res) => {
 router.get('/:id', requireMasterOrAdmin, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT id, phone, full_name, first_name, last_name, email, date_of_birth, nif,
-                    address_line1, address_line2, city, postal_code, district, country,
-                    notes, is_enterprise, company_name, registration_date, created_at, is_active
+            `SELECT id, phone, name, email, date_of_birth, nif,
+                    notes, is_enterprise, company_name, created_at, is_active
              FROM clients WHERE id = $1`,
             [req.params.id]
         );
@@ -68,23 +66,15 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
     console.log('🟢 User:', req.session.userType, 'ID:', req.session.userId);
     console.log('🟢 ============================================');
 
-    const { phone, first_name, last_name, email, date_of_birth, nif,
-            address_line1, address_line2, city, postal_code, district, country,
+    const { phone, name, email, date_of_birth, nif,
             notes, is_enterprise, company_name } = req.body;
 
-    console.log('📥 Received data from frontend:');
+    console.log('📥 Received data from frontend (V2 schema - no address fields):');
     console.log('   - phone:', phone);
-    console.log('   - first_name:', first_name);
-    console.log('   - last_name:', last_name);
+    console.log('   - name:', name);
     console.log('   - email:', email);
     console.log('   - date_of_birth:', date_of_birth);
     console.log('   - nif:', nif);
-    console.log('   - address_line1:', address_line1);
-    console.log('   - address_line2:', address_line2);
-    console.log('   - city:', city);
-    console.log('   - postal_code:', postal_code);
-    console.log('   - district:', district);
-    console.log('   - country:', country);
     console.log('   - notes:', notes);
     console.log('   - is_enterprise:', is_enterprise);
     console.log('   - company_name:', company_name);
@@ -94,33 +84,22 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
         const defaultPassword = await bcrypt.hash('lavandaria2025', 10);
         console.log('✅ Password hashed successfully');
 
-        // Build full_name based on client type
-        let full_name;
-        if (is_enterprise) {
-            full_name = company_name || 'Enterprise Client';
-            console.log('🏢 Enterprise client - full_name:', full_name);
-        } else {
-            full_name = `${first_name} ${last_name}`;
-            console.log('👤 Individual client - full_name:', full_name);
-        }
+        // V2 Schema: Use name directly (frontend should handle enterprise vs individual name logic)
+        const clientName = is_enterprise ? (company_name || name || 'Enterprise Client') : (name || 'Unnamed Client');
+        console.log('📝 V2 Schema - Client name:', clientName, '(enterprise:', is_enterprise, ')');
 
-        const query = `INSERT INTO clients (phone, password, full_name, first_name, last_name, email, date_of_birth,
-                                 nif, address_line1, address_line2, city, postal_code, district, country,
-                                 notes, is_enterprise, company_name)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-             RETURNING id, phone, full_name, first_name, last_name, email, date_of_birth, nif,
-                       address_line1, address_line2, city, postal_code, district, country,
+        const query = `INSERT INTO clients (phone, password, name, email, date_of_birth,
+                                 nif, notes, is_enterprise, company_name)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING id, phone, name, email, date_of_birth, nif,
                        notes, is_enterprise, company_name`;
 
-        const values = [phone, defaultPassword, full_name, first_name, last_name, email, date_of_birth,
-             nif, address_line1, address_line2, city, postal_code, district, country || 'Portugal',
-             notes, is_enterprise, company_name];
+        const values = [phone, defaultPassword, clientName, email, date_of_birth,
+             nif, notes, is_enterprise, company_name];
 
-        console.log('📝 Executing INSERT query with', values.length, 'parameters');
+        console.log('📝 Executing INSERT query with', values.length, 'parameters (V2 - no address)');
         console.log('📝 Values to insert:', {
-            phone, full_name, first_name, last_name, email, date_of_birth, nif,
-            address_line1, address_line2, city, postal_code, district,
-            country: country || 'Portugal', is_enterprise
+            phone, name: clientName, email, date_of_birth, nif, notes, is_enterprise
         });
 
         const result = await pool.query(query, values);
@@ -155,31 +134,22 @@ router.post('/', requireMasterOrAdmin, async (req, res) => {
 
 // Update client (Master or Admin only)
 router.put('/:id', requireMasterOrAdmin, async (req, res) => {
-    const { phone, first_name, last_name, email, date_of_birth, nif,
-            address_line1, address_line2, city, postal_code, district, country,
+    const { phone, name, email, date_of_birth, nif,
             notes, is_active, is_enterprise, company_name } = req.body;
 
     try {
-        // Build full_name based on client type
-        let full_name;
-        if (is_enterprise) {
-            full_name = company_name || 'Enterprise Client';
-        } else {
-            full_name = `${first_name} ${last_name}`;
-        }
+        // V2 Schema: Use name directly (frontend should provide appropriate name)
+        const clientName = is_enterprise ? (company_name || name || 'Enterprise Client') : (name || 'Unnamed Client');
 
         const result = await pool.query(
             `UPDATE clients
-             SET phone = $1, full_name = $2, first_name = $3, last_name = $4, email = $5,
-                 date_of_birth = $6, nif = $7, address_line1 = $8, address_line2 = $9, city = $10,
-                 postal_code = $11, district = $12, country = $13, notes = $14, is_active = $15,
-                 is_enterprise = $16, company_name = $17
-             WHERE id = $18
-             RETURNING id, phone, full_name, first_name, last_name, email, date_of_birth, nif,
-                       address_line1, address_line2, city, postal_code, district, country,
+             SET phone = $1, name = $2, email = $3,
+                 date_of_birth = $4, nif = $5, notes = $6, is_active = $7,
+                 is_enterprise = $8, company_name = $9
+             WHERE id = $10
+             RETURNING id, phone, name, email, date_of_birth, nif,
                        notes, is_active, is_enterprise, company_name`,
-            [phone, full_name, first_name, last_name, email, date_of_birth, nif,
-             address_line1, address_line2, city, postal_code, district, country || 'Portugal',
+            [phone, clientName, email, date_of_birth, nif,
              notes, is_active, is_enterprise, company_name, req.params.id]
         );
 

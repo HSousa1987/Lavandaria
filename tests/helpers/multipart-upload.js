@@ -7,12 +7,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const FormData = require('form-data');
 
 /**
  * Build multipart form data for photo uploads
  *
  * @param {string[]} filePaths - Array of absolute file paths to upload
- * @returns {Object} Multipart form data object for Playwright request API
+ * @returns {FormData} FormData object for Playwright request API
  *
  * Example:
  *   const formData = buildPhotoUploadForm(['/path/to/photo1.jpg', '/path/to/photo2.jpg']);
@@ -30,11 +31,11 @@ function buildPhotoUploadForm(filePaths) {
         }
     });
 
-    // For Playwright, when uploading multiple files to the same field name,
-    // we need to provide file objects with name, mimeType, and buffer
-    // The key insight: each file must be a separate object in the array
-    const files = filePaths.map(filePath => {
-        const buffer = fs.readFileSync(filePath);
+    // Create FormData instance - this is what Playwright's request API expects
+    const formData = new FormData();
+
+    // Add each file to the multipart form with proper stream handling
+    filePaths.forEach(filePath => {
         const filename = path.basename(filePath);
         const ext = path.extname(filename).toLowerCase();
 
@@ -49,19 +50,16 @@ function buildPhotoUploadForm(filePaths) {
 
         const mimeType = mimeTypes[ext] || 'application/octet-stream';
 
-        return {
-            name: filename,
-            mimeType: mimeType,
-            buffer: buffer
-        };
+        // Create a readable stream from the file and append to FormData
+        // FormData handles stream creation and event handlers properly
+        const fileStream = fs.createReadStream(filePath);
+        formData.append('photos', fileStream, {
+            filename: filename,
+            contentType: mimeType
+        });
     });
 
-    //  Return multipart with the photos field as an array
-    return {
-        multipart: {
-            photos: files
-        }
-    };
+    return formData;
 }
 
 /**
@@ -69,14 +67,14 @@ function buildPhotoUploadForm(filePaths) {
  *
  * @param {string[]} filePaths - Array of absolute file paths to upload
  * @param {Object} metadata - Additional form fields (e.g., { photo_type: 'before', room_area: 'Kitchen' })
- * @returns {Object} Multipart form data object for Playwright request API
+ * @returns {FormData} FormData object for Playwright request API
  */
 function buildPhotoUploadFormWithMetadata(filePaths, metadata = {}) {
     const formData = buildPhotoUploadForm(filePaths);
 
     // Add metadata fields to the multipart form
     Object.keys(metadata).forEach(key => {
-        formData.multipart[key] = String(metadata[key]);
+        formData.append(key, String(metadata[key]));
     });
 
     return formData;

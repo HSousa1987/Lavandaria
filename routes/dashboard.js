@@ -33,12 +33,10 @@ router.get('/stats', requireFinanceAccess, async (req, res) => {
         const airbnbResult = await pool.query('SELECT COUNT(*) as count FROM cleaning_jobs');
         const totalAirbnbOrders = parseInt(airbnbResult.rows[0].count);
 
-        // Total revenue (sum from both payment tables)
+        // Total revenue (sum from unified payments table)
         const revenueResult = await pool.query(`
-            SELECT (
-                COALESCE((SELECT SUM(amount) FROM payments_cleaning), 0) +
-                COALESCE((SELECT SUM(amount) FROM payments_laundry), 0)
-            ) as total
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM payments
         `);
         const totalRevenue = parseFloat(revenueResult.rows[0].total) || 0;
 
@@ -49,13 +47,13 @@ router.get('/stats', requireFinanceAccess, async (req, res) => {
 
         // Recent orders
         const recentOrders = await pool.query(`
-            (SELECT 'laundry' as type, lo.order_number, c.full_name as client_name, lo.status, lo.created_at
+            (SELECT 'laundry' as type, lo.order_number, c.name as client_name, lo.status, lo.created_at
              FROM laundry_orders_new lo
              JOIN clients c ON lo.client_id = c.id
              ORDER BY lo.created_at DESC
              LIMIT 5)
             UNION ALL
-            (SELECT 'airbnb' as type, CONCAT('CJ-', cj.id) as order_number, c.full_name as client_name, cj.status, cj.created_at
+            (SELECT 'airbnb' as type, CONCAT('CJ-', cj.id) as order_number, c.name as client_name, cj.status, cj.created_at
              FROM cleaning_jobs cj
              JOIN clients c ON cj.client_id = c.id
              ORDER BY cj.created_at DESC

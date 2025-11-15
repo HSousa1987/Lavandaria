@@ -40,7 +40,7 @@ router.get('/', requireFinanceAccess, async (req, res) => {
     try {
         const { limit, offset, sort, order } = validatePagination(req);
 
-        const query = `SELECT p.*, c.full_name as client_name, c.phone as client_phone
+        const query = `SELECT p.*, c.name as client_name, c.phone as client_phone
              FROM payments p
              JOIN clients c ON p.client_id = c.id
              ORDER BY p.payment_date ${order}

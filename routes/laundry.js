@@ -24,7 +24,7 @@ router.get('/', requireAuth, async (req, res) => {
 
         if (req.session.userType === 'master' || req.session.userType === 'admin' || req.session.userType === 'worker') {
             query = `
-                SELECT lo.*, c.full_name as client_name, c.phone as client_phone
+                SELECT lo.*, c.name as client_name, c.phone as client_phone
                 FROM laundry_orders lo
                 JOIN clients c ON lo.client_id = c.id
                 ORDER BY lo.created_at DESC

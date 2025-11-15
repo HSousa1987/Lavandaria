@@ -36,8 +36,8 @@ router.get('/', requireAuth, async (req, res) => {
             countParams = [];
             query = `
                 SELECT lo.*,
-                       c.full_name as client_name, c.phone as client_phone,
-                       u.full_name as worker_name
+                       c.name as client_name, c.phone as client_phone,
+                       u.name as worker_name
                 FROM laundry_orders_new lo
                 JOIN clients c ON lo.client_id = c.id
                 LEFT JOIN users u ON lo.assigned_worker_id = u.id
@@ -51,7 +51,7 @@ router.get('/', requireAuth, async (req, res) => {
             countParams = [];
             query = `
                 SELECT lo.*,
-                       c.full_name as client_name, c.phone as client_phone
+                       c.name as client_name, c.phone as client_phone
                 FROM laundry_orders_new lo
                 JOIN clients c ON lo.client_id = c.id
                 ORDER BY lo.created_at ${order}
@@ -64,7 +64,7 @@ router.get('/', requireAuth, async (req, res) => {
             countParams = [req.session.clientId];
             query = `
                 SELECT lo.*,
-                       u.full_name as worker_name
+                       u.name as worker_name
                 FROM laundry_orders_new lo
                 LEFT JOIN users u ON lo.assigned_worker_id = u.id
                 WHERE lo.client_id = $1
@@ -101,8 +101,8 @@ router.get('/:id', requireAuth, async (req, res) => {
     try {
         const orderResult = await pool.query(
             `SELECT lo.*,
-                    c.full_name as client_name, c.phone as client_phone, c.email as client_email,
-                    u.full_name as worker_name
+                    c.name as client_name, c.phone as client_phone, c.email as client_email,
+                    u.name as worker_name
              FROM laundry_orders_new lo
              JOIN clients c ON lo.client_id = c.id
              LEFT JOIN users u ON lo.assigned_worker_id = u.id
@@ -150,9 +150,9 @@ router.get('/:id/full', requireAuth, async (req, res) => {
     try {
         const orderResult = await pool.query(
             `SELECT lo.*,
-                    c.full_name as client_name, c.phone as client_phone, c.email as client_email,
-                    c.address_line1, c.address_line2, c.city, c.postal_code, c.district, c.country,
-                    u.full_name as worker_name,
+                    c.name as client_name, c.phone as client_phone, c.email as client_email,
+                    c.address_line1, c.address_line2, c.city, c.postal_code, c.district, c.country_REMOVED_IN_V2,
+                    u.name as worker_name,
                     creator.full_name as created_by_name
              FROM laundry_orders_new lo
              JOIN clients c ON lo.client_id = c.id
@@ -187,7 +187,7 @@ router.get('/:id/full', requireAuth, async (req, res) => {
 
         // Get payments for this order
         const paymentsResult = await pool.query(
-            `SELECT p.*, u.full_name as recorded_by_name
+            `SELECT p.*, u.name as recorded_by_name
              FROM payments p
              LEFT JOIN users u ON u.id = (p.notes::jsonb->>'recorded_by_user_id')::integer
              WHERE p.order_type = 'laundry' AND p.order_id = $1
@@ -197,7 +197,7 @@ router.get('/:id/full', requireAuth, async (req, res) => {
 
         // Get status history
         const historyResult = await pool.query(
-            `SELECT osh.*, u.full_name as changed_by_name
+            `SELECT osh.*, u.name as changed_by_name
              FROM order_status_history osh
              LEFT JOIN users u ON osh.changed_by = u.id
              WHERE osh.order_type = 'laundry' AND osh.order_id = $1
@@ -374,7 +374,7 @@ router.post('/:id/mark-ready', requireStaff, async (req, res) => {
     try {
         // Get order details
         const orderResult = await pool.query(
-            `SELECT lo.*, c.full_name, c.phone, c.email
+            `SELECT lo.*, c.name, c.phone, c.email
              FROM laundry_orders_new lo
              JOIN clients c ON lo.client_id = c.id
              WHERE lo.id = $1`,

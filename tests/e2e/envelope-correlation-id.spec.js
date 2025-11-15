@@ -17,12 +17,37 @@ const MASTER_CREDENTIALS = {
 };
 
 async function loginAsMaster(page) {
-    await page.goto('/');
-    await page.click('button:has-text("Staff")');
-    await page.fill('input[name="username"]', MASTER_CREDENTIALS.username);
-    await page.fill('input[name="password"]', MASTER_CREDENTIALS.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('/dashboard', { timeout: 10000 });
+    await page.goto('http://localhost:3000');
+    // Wait for page to load
+    await page.waitForLoadState('networkidle');
+
+    // Check if already logged in by trying to access dashboard
+    const currentUrl = page.url();
+    if (currentUrl.includes('dashboard')) {
+        // Already logged in, logout first
+        const logoutBtn = page.getByRole('button', { name: /logout/i });
+        if (await logoutBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await logoutBtn.click();
+            await page.waitForURL(/\/$/, { timeout: 5000 });
+        }
+    }
+
+    // Now navigate to login
+    await page.goto('http://localhost:3000/');
+    await page.waitForLoadState('networkidle');
+
+    // Select Staff button (plain button, not tab role)
+    await page.getByRole('button', { name: 'Staff' }).click();
+
+    // Fill credentials using placeholders
+    await page.getByPlaceholder(/username/i).fill(MASTER_CREDENTIALS.username);
+    await page.getByPlaceholder(/password/i).fill(MASTER_CREDENTIALS.password);
+
+    // Submit login form
+    await page.getByRole('button', { name: /login/i }).click();
+
+    // Wait for dashboard
+    await page.waitForURL(/\/dashboard/, { timeout: 10000 });
 }
 
 test.describe('Envelope & Correlation ID Contract', () => {

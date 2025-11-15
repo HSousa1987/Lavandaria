@@ -1,0 +1,139 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - heading "Lavandaria Dashboard" [level=1] [ref=e8]
+        - paragraph [ref=e9]: Welcome, Admin User (admin)
+      - button "Logout" [ref=e10] [cursor=pointer]
+  - main [ref=e11]:
+    - tablist [ref=e14]:
+      - tab "Overview" [ref=e15] [cursor=pointer]
+      - tab "Workers" [ref=e16] [cursor=pointer]
+      - tab "Clients" [ref=e17] [cursor=pointer]
+      - tab "All Jobs" [ref=e18] [cursor=pointer]
+      - tab "Cleaning Jobs" [selected] [ref=e19] [cursor=pointer]
+      - tab "Laundry Orders" [ref=e20] [cursor=pointer]
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - heading "Cleaning Jobs" [level=2] [ref=e23]
+        - button "Create Cleaning Job" [ref=e24] [cursor=pointer]
+      - table [ref=e26]:
+        - rowgroup [ref=e27]:
+          - row "Type Client Address Scheduled Status Cost Actions" [ref=e28]:
+            - cell "Type" [ref=e29]
+            - cell "Client" [ref=e30]
+            - cell "Address" [ref=e31]
+            - cell "Scheduled" [ref=e32]
+            - cell "Status" [ref=e33]
+            - cell "Cost" [ref=e34]
+            - cell "Actions" [ref=e35]
+        - rowgroup [ref=e36]:
+          - row "airbnb Test Client 11/14/2025 10:00:00 in_progress €0.00 View Details Edit" [ref=e37]:
+            - cell "airbnb" [ref=e38]
+            - cell "Test Client" [ref=e39]
+            - cell [ref=e40]
+            - cell "11/14/2025 10:00:00" [ref=e41]
+            - cell "in_progress" [ref=e42]
+            - cell "€0.00" [ref=e43]
+            - cell "View Details Edit" [ref=e44]:
+              - generic [ref=e45]:
+                - button "View Details" [ref=e46] [cursor=pointer]
+                - button "Edit" [active] [ref=e47] [cursor=pointer]
+  - generic [ref=e49]:
+    - heading "Edit Cleaning Job" [level=3] [ref=e50]
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - generic [ref=e53]:
+          - generic [ref=e54]: Job Type *
+          - combobox [ref=e55]:
+            - option "Airbnb" [selected]
+            - option "House"
+        - generic [ref=e56]:
+          - generic [ref=e57]: Client *
+          - combobox [ref=e58]:
+            - option "Select client..."
+            - option [selected]
+        - generic [ref=e59]:
+          - generic [ref=e60]: Property Name
+          - textbox "e.g., Riverside Apartment 3A" [ref=e61]: Test Airbnb Apartment
+        - generic [ref=e62]:
+          - generic [ref=e63]: Address Line 1 *
+          - textbox "Street address" [ref=e64]: Avenida da Liberdade, 100
+        - generic [ref=e65]:
+          - generic [ref=e66]: Address Line 2
+          - textbox "Apartment, suite, etc." [ref=e67]
+        - generic [ref=e68]:
+          - generic [ref=e69]: City *
+          - textbox [ref=e70]: Lisboa
+        - generic [ref=e71]:
+          - generic [ref=e72]: Postal Code *
+          - textbox [ref=e73]: 1200-001
+        - generic [ref=e74]:
+          - generic [ref=e75]: Scheduled Date *
+          - textbox [ref=e76]: 2025-11-14
+        - generic [ref=e77]:
+          - generic [ref=e78]: Scheduled Time *
+          - textbox [ref=e79]: 10:00:00
+        - generic [ref=e80]:
+          - generic [ref=e81]: Estimated Hours *
+          - spinbutton [ref=e82]
+          - paragraph [ref=e83]: Used to calculate estimated cost
+        - generic [ref=e84]:
+          - generic [ref=e85]: Hourly Rate (€) *
+          - spinbutton [ref=e86]: "15.00"
+        - generic [ref=e87]:
+          - generic [ref=e88]: Assign Workers (Multiple) *
+          - generic [ref=e91] [cursor=pointer]:
+            - checkbox "worker1" [ref=e92]
+            - generic [ref=e93]: worker1
+          - paragraph [ref=e94]: "Select all workers who will work on this job. Admins can also be assigned. Selected: 0"
+        - generic [ref=e95]:
+          - generic [ref=e96]: Special Instructions
+          - textbox "Any special requirements or notes..." [ref=e97]
+      - generic [ref=e98]:
+        - button "Create Job" [ref=e99] [cursor=pointer]
+        - button "Cancel" [ref=e100] [cursor=pointer]
+  - generic [ref=e102]:
+    - generic [ref=e103]:
+      - heading "Edit Cleaning Job" [level=2] [ref=e104]
+      - button "Close modal" [ref=e105] [cursor=pointer]: ×
+    - generic [ref=e107]:
+      - generic [ref=e108]:
+        - generic [ref=e109]: Client *
+        - combobox [ref=e110]:
+          - option "Select a client"
+          - option "Test Client" [selected]
+      - generic [ref=e111]:
+        - generic [ref=e112]: Job Type *
+        - combobox [ref=e113]:
+          - option "House Cleaning"
+          - option "Airbnb Cleaning" [selected]
+      - generic [ref=e114]:
+        - generic [ref=e115]: Address *
+        - textbox [ref=e116]
+      - generic [ref=e117]:
+        - generic [ref=e118]:
+          - generic [ref=e119]: Date *
+          - textbox [ref=e120]: 2025-11-14
+        - generic [ref=e121]:
+          - generic [ref=e122]: Time *
+          - textbox [ref=e123]: 10:00:00
+      - generic [ref=e124]:
+        - generic [ref=e125]: Assigned Worker
+        - combobox [ref=e126]:
+          - option "None (Unassigned)"
+          - option "worker1" [selected]
+      - generic [ref=e127]:
+        - generic [ref=e128]: Status
+        - combobox [ref=e129]:
+          - option "Scheduled"
+          - option "In Progress" [selected]
+          - option "Completed"
+          - option "Cancelled"
+      - generic [ref=e130]:
+        - button "Cancel" [ref=e131] [cursor=pointer]
+        - button "Update Job" [ref=e132] [cursor=pointer]
+```

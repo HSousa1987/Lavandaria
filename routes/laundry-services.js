@@ -30,18 +30,32 @@ router.get('/', requireAuth, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT
-                id, service_code, service_name, base_price, unit,
-                is_package, package_includes, description, is_active,
-                updated_by, updated_at, created_at
+                id, name, service_type, base_price, unit,
+                estimated_duration_minutes, description, is_active,
+                updated_at, created_at
             FROM laundry_services
             WHERE is_active = TRUE
             ORDER BY id
         `);
 
-        res.json(result.rows);
+        res.json({
+            success: true,
+            data: result.rows,
+            _meta: {
+                timestamp: new Date().toISOString(),
+                correlationId: req.correlationId
+            }
+        });
     } catch (error) {
         console.error('Error fetching laundry services:', error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({
+            success: false,
+            error: 'Server error',
+            _meta: {
+                timestamp: new Date().toISOString(),
+                correlationId: req.correlationId
+            }
+        });
     }
 });
 
@@ -54,21 +68,42 @@ router.get('/:id', requireAuth, async (req, res) => {
 
         const result = await pool.query(`
             SELECT
-                id, service_code, service_name, base_price, unit,
-                is_package, package_includes, description, is_active,
-                updated_by, updated_at, created_at
+                id, name, service_type, base_price, unit,
+                estimated_duration_minutes, description, is_active,
+                updated_at, created_at
             FROM laundry_services
             WHERE id = $1
         `, [id]);
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Service not found' });
+            return res.status(404).json({
+                success: false,
+                error: 'Service not found',
+                _meta: {
+                    timestamp: new Date().toISOString(),
+                    correlationId: req.correlationId
+                }
+            });
         }
 
-        res.json(result.rows[0]);
+        res.json({
+            success: true,
+            data: result.rows[0],
+            _meta: {
+                timestamp: new Date().toISOString(),
+                correlationId: req.correlationId
+            }
+        });
     } catch (error) {
         console.error('Error fetching service:', error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({
+            success: false,
+            error: 'Server error',
+            _meta: {
+                timestamp: new Date().toISOString(),
+                correlationId: req.correlationId
+            }
+        });
     }
 });
 
@@ -86,7 +121,14 @@ router.put('/:id', requireAuth, requireMasterOrAdmin, async (req, res) => {
         if (base_price !== undefined) {
             const price = parseFloat(base_price);
             if (isNaN(price) || price < 0) {
-                return res.status(400).json({ error: 'base_price must be a positive number' });
+                return res.status(400).json({
+                    success: false,
+                    error: 'base_price must be a positive number',
+                    _meta: {
+                        timestamp: new Date().toISOString(),
+                        correlationId: req.correlationId
+                    }
+                });
             }
         }
 
@@ -111,13 +153,17 @@ router.put('/:id', requireAuth, requireMasterOrAdmin, async (req, res) => {
         }
 
         if (updates.length === 0) {
-            return res.status(400).json({ error: 'No fields to update' });
+            return res.status(400).json({
+                success: false,
+                error: 'No fields to update',
+                _meta: {
+                    timestamp: new Date().toISOString(),
+                    correlationId: req.correlationId
+                }
+            });
         }
 
-        // Add updated_by and updated_at
-        updates.push(`updated_by = $${paramCount++}`);
-        values.push(req.session.userId);
-
+        // Add updated_at
         updates.push(`updated_at = CURRENT_TIMESTAMP`);
 
         // Add id to values for WHERE clause
@@ -133,44 +179,71 @@ router.put('/:id', requireAuth, requireMasterOrAdmin, async (req, res) => {
         const result = await pool.query(query, values);
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Service not found' });
+            return res.status(404).json({
+                success: false,
+                error: 'Service not found',
+                _meta: {
+                    timestamp: new Date().toISOString(),
+                    correlationId: req.correlationId
+                }
+            });
         }
 
         res.json({
             success: true,
-            message: `Service '${result.rows[0].service_name}' updated successfully`,
-            service: result.rows[0]
+            data: result.rows[0],
+            _meta: {
+                timestamp: new Date().toISOString(),
+                correlationId: req.correlationId
+            }
         });
     } catch (error) {
         console.error('Error updating service:', error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({
+            success: false,
+            error: 'Server error',
+            _meta: {
+                timestamp: new Date().toISOString(),
+                correlationId: req.correlationId
+            }
+        });
     }
 });
 
 // ==============================================
-// GET SERVICE BY CODE (Utility endpoint)
+// GET SERVICES BY NAME (Search endpoint)
 // ==============================================
-router.get('/code/:code', requireAuth, async (req, res) => {
+router.get('/search/:name', requireAuth, async (req, res) => {
     try {
-        const { code } = req.params;
+        const { name } = req.params;
 
         const result = await pool.query(`
             SELECT
-                id, service_code, service_name, base_price, unit,
-                is_package, package_includes, description, is_active,
-                updated_by, updated_at, created_at
+                id, name, service_type, base_price, unit,
+                estimated_duration_minutes, description, is_active,
+                updated_at, created_at
             FROM laundry_services
-            WHERE service_code = $1 AND is_active = TRUE
-        `, [code]);
+            WHERE name ILIKE $1 AND is_active = TRUE
+        `, [`%${name}%`]);
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Service not found' });
-        }
-
-        res.json(result.rows[0]);
+        res.json({
+            success: true,
+            data: result.rows,
+            _meta: {
+                timestamp: new Date().toISOString(),
+                correlationId: req.correlationId
+            }
+        });
     } catch (error) {
-        console.error('Error fetching service by code:', error);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Error searching services:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Server error',
+            _meta: {
+                timestamp: new Date().toISOString(),
+                correlationId: req.correlationId
+            }
+        });
     }
 });
 

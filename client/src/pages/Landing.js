@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -21,10 +21,17 @@ const Landing = () => {
     }
   }, [user, navigate]);
 
-  const handleSubmit = async (e) => {
+  // Define handleSubmit BEFORE it's used in useEffect
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    window.LANDING_DEBUG = window.LANDING_DEBUG || {};
+    window.LANDING_DEBUG.handleSubmitCalled = true;
+
+    console.log('🔐 [Landing] handleSubmit called');
+    console.log('  - activeTab:', activeTab);
 
     try {
       const isClient = activeTab === 'client';
@@ -32,19 +39,61 @@ const Landing = () => {
         ? { phone: formData.phone, password: formData.password }
         : { username: formData.username, password: formData.password };
 
+      console.log('🔐 [Landing] About to call login() with credentials');
       const response = await login(credentials, isClient);
+      window.LANDING_DEBUG.loginReturned = true;
+      window.LANDING_DEBUG.loginResponse = response;
+      console.log('🔐 [Landing] login() returned response:', response);
 
       if (response.client && response.client.mustChangePassword) {
+        console.log('🔐 [Landing] Redirecting to /change-password (mustChangePassword)');
+        window.LANDING_DEBUG.navigateToCPW = true;
         navigate('/change-password');
       } else {
+        console.log('🔐 [Landing] Redirecting to /dashboard');
+        window.LANDING_DEBUG.navigateToDashboard = true;
         navigate('/dashboard');
       }
     } catch (err) {
+      window.LANDING_DEBUG.loginError = err;
+      console.error('🔐 [Landing] Login error:', err);
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, formData, login, navigate]);
+
+  // Workaround for React event delegation failure: use document-level event delegation
+  // This is necessary because React's synthetic event system isn't properly attaching
+  // event handlers to form elements in this component. Using document-level event capture
+  // bypasses React's event delegation and directly triggers the handler.
+  useEffect(() => {
+    // Add global click listener on document that bubbles down to our form button
+    const handleDocumentClick = async (e) => {
+      // Check if the clicked element is the login button (contains "Login" text)
+      const button = e.target.closest('button');
+      if (!button) return;
+
+      const buttonText = button.textContent.trim();
+      if (!buttonText.includes('Login') && !buttonText.includes('Logging in')) return;
+
+      // Verify the button is in a form (our login form)
+      const form = button.closest('form');
+      if (!form) return;
+
+      // Now we know this is our login button
+      console.log('[VANILLA-JS] Login button clicked via document listener');
+      e.preventDefault();
+      await handleSubmit(e);
+    };
+
+    // Use capture phase to intercept clicks before React
+    document.addEventListener('click', handleDocumentClick, true);
+
+    return () => {
+      document.removeEventListener('click', handleDocumentClick, true);
+    };
+  }, [handleSubmit]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -116,7 +165,7 @@ const Landing = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form className="space-y-5">
               {error && (
                 <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded-lg text-sm">
                   {error}
@@ -192,7 +241,8 @@ const Landing = () => {
               </div>
 
               <button
-                type="submit"
+                type="button"
+                onClick={handleSubmit}
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3.5 rounded-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
               >

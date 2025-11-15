@@ -143,6 +143,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/clients', require('./routes/clients'));
 app.use('/api/properties', require('./routes/properties'));
+app.use('/api/role-types', require('./routes/role-types')); // Role types for UserModal
 
 // ⚠️ LEGACY ROUTES (DISABLED - Cutover executed on 2025-10-08)
 // Return 410 Gone with migration guidance
