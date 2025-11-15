@@ -7,6 +7,8 @@ import UserForm from '../components/forms/UserForm';
 import ClientForm from '../components/forms/ClientForm';
 import CleaningJobForm from '../components/forms/CleaningJobForm';
 import LaundryOrderForm from '../components/forms/LaundryOrderForm';
+import UserModal from '../components/modals/UserModal';
+import ClientModal from '../components/modals/ClientModal';
 
 const Dashboard = () => {
   const { user, logout, isMaster, isAdmin, isWorker, isClient } = useAuth();
@@ -35,6 +37,12 @@ const Dashboard = () => {
   const [editingClient, setEditingClient] = useState(null);
   const [editingCleaningJob, setEditingCleaningJob] = useState(null);
   const [editingLaundryOrder, setEditingLaundryOrder] = useState(null);
+
+  // Modal states for V2 modals
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [editingUserForModal, setEditingUserForModal] = useState(null);
+  const [editingClientForModal, setEditingClientForModal] = useState(null);
 
   // Order detail modal states
   const [viewingOrderDetail, setViewingOrderDetail] = useState(null);
@@ -791,7 +799,10 @@ const Dashboard = () => {
             <div className="p-6 border-b flex justify-between items-center">
               <h2 className="text-lg font-semibold">{isMaster ? 'All Users' : 'Workers'}</h2>
               <button
-                onClick={() => setShowUserForm(true)}
+                onClick={() => {
+                  setEditingUserForModal(null);
+                  setShowUserModal(true);
+                }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Add {isAdmin ? 'Worker' : 'User'}
@@ -812,7 +823,7 @@ const Dashboard = () => {
                   {(isMaster ? users : workers).map((u) => (
                     <tr key={u.id} className="border-b hover:bg-gray-50">
                       <td className="py-3 px-4">{u.username}</td>
-                      <td className="py-3 px-4">{u.full_name}</td>
+                      <td className="py-3 px-4">{u.name}</td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-1 rounded text-xs ${
                           u.role === 'master' ? 'bg-purple-100 text-purple-800' :
@@ -855,7 +866,10 @@ const Dashboard = () => {
             <div className="p-6 border-b flex justify-between items-center">
               <h2 className="text-lg font-semibold">Clients</h2>
               <button
-                onClick={() => setShowClientForm(true)}
+                onClick={() => {
+                  setEditingClientForModal(null);
+                  setShowClientModal(true);
+                }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Add Client
@@ -875,7 +889,7 @@ const Dashboard = () => {
                 <tbody>
                   {clients.map((client) => (
                     <tr key={client.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">{client.full_name}</td>
+                      <td className="py-3 px-4">{client.name}</td>
                       <td className="py-3 px-4">{client.phone}</td>
                       <td className="py-3 px-4">{client.email || '-'}</td>
                       <td className="py-3 px-4">
@@ -2593,6 +2607,49 @@ const Dashboard = () => {
           }}
         />
       </Modal>
+
+      {/* V2 Modal Components */}
+      <UserModal
+        isOpen={showUserModal}
+        onClose={() => {
+          setShowUserModal(false);
+          setEditingUserForModal(null);
+        }}
+        onSuccess={() => {
+          // Refresh users list
+          const fetchUsers = async () => {
+            try {
+              const response = await axios.get('/api/users');
+              setUsers(response.data.data);
+            } catch (err) {
+              console.error('Error fetching users:', err);
+            }
+          };
+          fetchUsers();
+        }}
+        editingUser={editingUserForModal}
+      />
+
+      <ClientModal
+        isOpen={showClientModal}
+        onClose={() => {
+          setShowClientModal(false);
+          setEditingClientForModal(null);
+        }}
+        onSuccess={() => {
+          // Refresh clients list
+          const fetchClients = async () => {
+            try {
+              const response = await axios.get('/api/clients');
+              setClients(response.data.data);
+            } catch (err) {
+              console.error('Error fetching clients:', err);
+            }
+          };
+          fetchClients();
+        }}
+        editingClient={editingClientForModal}
+      />
     </div>
   );
 };
