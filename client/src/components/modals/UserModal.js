@@ -21,10 +21,21 @@ const UserModal = ({ isOpen, onClose, onSuccess, editingUser }) => {
         const fetchRoleTypes = async () => {
             try {
                 const response = await axios.get('/api/role-types');
-                setRoleTypes(response.data.data || response.data);
+
+                // Defensive check: Ensure response.data is an array
+                const roleData = response.data.data || response.data;
+                if (Array.isArray(roleData)) {
+                    setRoleTypes(roleData);
+                    setError(''); // Clear any previous errors
+                } else {
+                    console.error('Invalid role types response format:', roleData);
+                    setRoleTypes([]);
+                    setError('Invalid role types format. Please contact support.');
+                }
             } catch (err) {
                 console.error('Error fetching role types:', err);
-                setError('Failed to load role types');
+                setRoleTypes([]); // Set empty array instead of leaving undefined
+                setError('Failed to load role types. Cannot create users without roles.');
             }
         };
 
@@ -153,14 +164,22 @@ const UserModal = ({ isOpen, onClose, onSuccess, editingUser }) => {
                                 onChange={handleChange}
                                 className="w-full px-4 py-2 border rounded-lg"
                                 required
+                                disabled={roleTypes.length === 0}
                             >
-                                <option value="">Select Role</option>
+                                <option value="">
+                                    {roleTypes.length === 0 ? 'Loading roles...' : 'Select Role'}
+                                </option>
                                 {roleTypes.map(rt => (
                                     <option key={rt.id} value={rt.id}>
                                         {rt.role_name || rt.name}
                                     </option>
                                 ))}
                             </select>
+                            {roleTypes.length === 0 && (
+                                <p className="text-sm text-red-500 mt-1">
+                                    Role types failed to load. Please try closing and reopening the modal.
+                                </p>
+                            )}
                         </div>
 
                         <div className="mb-4">
